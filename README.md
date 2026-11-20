@@ -1,45 +1,43 @@
 # ClinicDesk
 
-ClinicDesk is a monorepo with a React/TypeScript web client and an Express/TypeScript API.
+[![CI](https://github.com/soltaniheb23/ClinicDesk/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/soltaniheb23/ClinicDesk/actions/workflows/ci.yml)
 
-## Requirements
+ClinicDesk is a clinic helpdesk app with a React client and an Express API.
 
-- Node.js 20.19+ or 22.12+
-- npm 10+
+## Getting started
 
-## Setup
+Use the current Node.js LTS release and npm.
 
-From the repository root:
+Install dependencies in separate terminals:
 
 ```sh
-npm install
+cd server
+npm ci
 cp .env.example .env
 npm run dev
 ```
 
-The client runs at <http://localhost:5173> and the API at <http://localhost:3000>.
-The API health check is available at <http://localhost:3000/health>.
+```sh
+cd client
+npm ci
+npm run dev
+```
 
-The shared `.env` file configures `PORT` and `VITE_API_URL`. Variables prefixed with
-`VITE_` are included in the browser bundle and must not contain secrets.
+The client runs at <http://localhost:5173>; the API health check is at
+<http://localhost:3000/health>.
 
-## Useful commands
-
-Run these from the repository root:
+Run checks from each app folder:
 
 ```sh
-npm run build       # Build both workspaces
-npm run lint        # Lint client, server, and shared configuration
-npm run format      # Format supported files
-npm run format:check
+npm run lint
+npm test
 ```
 
-GitHub Actions runs the formatting check, linter, and both workspace builds on every
-push and pull request.
+The client also has a production build:
 
-## Repository layout
-
-```text
-client/  React app and Vite configuration
-server/  Express API
+```sh
+npm run build
 ```
+
+GitHub Actions runs the server lint and tests and the client lint, tests, and build
+on pull requests targeting `main` and pushes to `main`.

@@ -2,24 +2,20 @@ import js from '@eslint/js';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import globals from 'globals';
-import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
+export default [
   {
-    ignores: ['**/dist/**', '**/node_modules/**'],
+    ignores: ['node_modules/**', 'dist/**', 'coverage/**'],
   },
   {
-    files: ['**/*.{js,mjs,cjs}'],
-    extends: [js.configs.recommended],
+    files: ['**/*.{js,jsx}'],
+    ...js.configs.recommended,
     languageOptions: {
-      globals: globals.node,
-    },
-  },
-  ...tseslint.configs.recommended,
-  {
-    files: ['client/src/**/*.{ts,tsx}'],
-    languageOptions: {
+      ...js.configs.recommended.languageOptions,
       globals: globals.browser,
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+      },
     },
     plugins: {
       'react-hooks': reactHooks,
@@ -30,4 +26,10 @@ export default tseslint.config(
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },
-);
+  {
+    files: ['vite.config.js', 'eslint.config.mjs'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+];
