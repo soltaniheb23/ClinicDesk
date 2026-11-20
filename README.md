@@ -34,6 +34,9 @@ npm run format      # Format supported files
 npm run format:check
 ```
 
+GitHub Actions runs the formatting check, linter, and both workspace builds on every
+push and pull request.
+
 ## Repository layout
 
 ```text
