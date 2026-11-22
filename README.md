@@ -60,6 +60,14 @@ npm run build
 GitHub Actions runs the server lint and tests and the client lint, tests, and build
 on pull requests targeting `main` and pushes to `main`.
 
+## API and data model
+
+- Base URL (local): `http://localhost:3000/api/v1`
+- API contract (OpenAPI 3): [`docs/openapi.yaml`](docs/openapi.yaml)
+- Data model (ER diagram): [`docs/er-diagram.md`](docs/er-diagram.md)
+
+To view the API contract as interactive documentation, paste `docs/openapi.yaml` into [Swagger Editor](https://editor.swagger.io).
+
 ## Project management
 Backlog and sprints are tracked on Trello (33 tickets, 3 sprints).
 

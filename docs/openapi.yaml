@@ -1,0 +1,475 @@
+openapi: 3.0.3
+info:
+  title: ClinicDesk API
+  version: 1.0.0
+  description: Helpdesk API for a clinic. Draft contract for ticket CD-5.
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Tickets
+  - name: Comments
+  - name: Attachments
+  - name: Users
+  - name: Admin
+
+paths:
+  /health:
+    servers:
+      - url: http://localhost:3000
+    get:
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: API is running
+          content:
+            application/json:
+              example: { status: ok }
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a customer
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example: { name: Mara Jensen, email: mara@example.com, password: a-long-password }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              example: { user: { id: '6650a1', name: Mara Jensen, email: mara@example.com, role: customer } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409':
+          description: Email already used (EMAIL_TAKEN)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example: { email: mara@example.com, password: a-long-password }
+      responses:
+        '200':
+          description: Token and user
+          content:
+            application/json:
+              example: { token: '<jwt>', user: { id: '6650a1', name: Mara Jensen, role: customer } }
+        '401':
+          description: Wrong email or password (INVALID_CREDENTIALS, always the same message)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Too many login attempts
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current user
+      responses:
+        '200':
+          description: The logged-in user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /tickets:
+    get:
+      tags: [Tickets]
+      summary: List tickets (customers see only their own)
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/Status' } }
+        - { name: priority, in: query, schema: { $ref: '#/components/schemas/Priority' } }
+        - { name: category, in: query, schema: { $ref: '#/components/schemas/Category' } }
+        - { name: assignee, in: query, schema: { type: string } }
+        - { name: q, in: query, description: Title search, schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, default: '-createdAt' } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200':
+          description: Paginated tickets
+          content:
+            application/json:
+              example:
+                items: [ { id: '6651b2', title: Printer in reception not working, status: open, priority: high } ]
+                page: 1
+                limit: 20
+                total: 1
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Tickets]
+      summary: Create a ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TicketCreate' }
+            example:
+              title: Printer in reception not working
+              description: It shows error E-12 since this morning.
+              category: it
+              priority: high
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              example:
+                ticket:
+                  id: '6651b2'
+                  title: Printer in reception not working
+                  status: open
+                  priority: high
+                  category: it
+                  createdBy: '6650a1'
+                  assignee: null
+                  createdAt: '2026-12-01T09:15:00.000Z'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /tickets/{id}:
+    get:
+      tags: [Tickets]
+      summary: Ticket detail (owner, agent, admin)
+      parameters: [ { $ref: '#/components/parameters/TicketId' } ]
+      responses:
+        '200':
+          description: The ticket
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ticket' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /tickets/{id}/status:
+    patch:
+      tags: [Tickets]
+      summary: Change status (agent, admin; customer may close own resolved ticket)
+      parameters: [ { $ref: '#/components/parameters/TicketId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/Status' }
+            example: { status: in_progress }
+      responses:
+        '200':
+          description: Updated ticket
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ticket' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Invalid status change (INVALID_STATUS_TRANSITION)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /tickets/{id}/assignee:
+    patch:
+      tags: [Tickets]
+      summary: Assign or claim a ticket (agent, admin)
+      parameters: [ { $ref: '#/components/parameters/TicketId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignee]
+              properties:
+                assignee: { type: string, nullable: true }
+            example: { assignee: '6650c3' }
+      responses:
+        '200':
+          description: Updated ticket
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ticket' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /tickets/{id}/comments:
+    get:
+      tags: [Comments]
+      summary: List comments (internal notes hidden from customers)
+      parameters: [ { $ref: '#/components/parameters/TicketId' } ]
+      responses:
+        '200':
+          description: Comments in chronological order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Comment' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Comments]
+      summary: Add a comment
+      parameters: [ { $ref: '#/components/parameters/TicketId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, maxLength: 2000 }
+                isInternal: { type: boolean, default: false }
+            example: { body: We are replacing the toner today., isInternal: false }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Comment' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /tickets/{id}/attachments:
+    post:
+      tags: [Attachments]
+      summary: Upload a file (png, jpeg, pdf; max 5 MB)
+      parameters: [ { $ref: '#/components/parameters/TicketId' } ]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201':
+          description: Created
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /attachments/{id}:
+    get:
+      tags: [Attachments]
+      summary: Download a file (access checked)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The file
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /users:
+    get:
+      tags: [Users]
+      summary: List users (admin)
+      responses:
+        '200':
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/User' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Users]
+      summary: Create a user (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, role]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 10 }
+                role: { $ref: '#/components/schemas/Role' }
+      responses:
+        '201':
+          description: Created
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Email already used
+
+  /users/{id}:
+    patch:
+      tags: [Users]
+      summary: Change role or deactivate a user (admin)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role: { $ref: '#/components/schemas/Role' }
+                isActive: { type: boolean }
+            example: { isActive: false }
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /audit-logs:
+    get:
+      tags: [Admin]
+      summary: List audit entries (admin, read only)
+      responses:
+        '200':
+          description: Audit entries, newest first
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /metrics/summary:
+    get:
+      tags: [Admin]
+      summary: Open tickets, average resolution time, tickets per agent (admin)
+      responses:
+        '200':
+          description: Metrics
+          content:
+            application/json:
+              example:
+                openTickets: 12
+                averageResolutionHours: 6.5
+                ticketsPerAgent: [ { agent: Lena, count: 5 } ]
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    TicketId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+  responses:
+    Unauthorized:
+      description: Not logged in or invalid token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Not allowed for this role
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Not found (also used for tickets the user must not see)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Role: { type: string, enum: [customer, agent, admin] }
+    Status: { type: string, enum: [open, in_progress, waiting, resolved, closed] }
+    Priority: { type: string, enum: [low, normal, high, urgent] }
+    Category: { type: string, enum: [it, facility, account, other] }
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string, example: VALIDATION_ERROR }
+            message: { type: string }
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field: { type: string }
+                  message: { type: string }
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, maxLength: 80 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 10 }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/Role' }
+        isActive: { type: boolean }
+    TicketCreate:
+      type: object
+      required: [title, description]
+      properties:
+        title: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 5000 }
+        category: { $ref: '#/components/schemas/Category' }
+        priority: { $ref: '#/components/schemas/Priority' }
+    Ticket:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        category: { $ref: '#/components/schemas/Category' }
+        priority: { $ref: '#/components/schemas/Priority' }
+        status: { $ref: '#/components/schemas/Status' }
+        createdBy: { type: string }
+        assignee: { type: string, nullable: true }
+        firstResponseAt: { type: string, format: date-time, nullable: true }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Comment:
+      type: object
+      properties:
+        id: { type: string }
+        ticket: { type: string }
+        author: { type: string }
+        body: { type: string }
+        isInternal: { type: boolean }
+        createdAt: { type: string, format: date-time }
