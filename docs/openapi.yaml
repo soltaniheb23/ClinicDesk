@@ -50,6 +50,9 @@ paths:
     post:
       tags: [Auth]
       summary: Register a customer
+      description: >
+        Creates a customer account and returns the user with an access token.
+        Any `role` sent by the client is ignored; new accounts are always `customer`.
       security: []
       requestBody:
         required: true
@@ -63,18 +66,42 @@ paths:
           description: Created
           content:
             application/json:
-              example: { user: { id: '6650a1', name: Mara Jensen, email: mara@example.com, role: customer } }
-        '400': { $ref: '#/components/responses/ValidationError' }
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+              example:
+                user:
+                  id: 6650a1f2c3d4e5f6a7b8c9d0
+                  name: Mara Jensen
+                  email: mara@example.com
+                  role: customer
+                  isActive: true
+                  createdAt: '2026-12-01T09:00:00.000Z'
+                  updatedAt: '2026-12-01T09:00:00.000Z'
+                token: '<jwt>'
+        '400':
+          description: Validation error (VALIDATION_ERROR)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: Some fields are invalid
+                  details: [ { field: password, message: Password must be at least 8 characters } ]
         '409':
           description: Email already used (EMAIL_TAKEN)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: EMAIL_TAKEN, message: An account with this email already exists }
 
   /auth/login:
     post:
       tags: [Auth]
       summary: Log in
+      description: >
+        Returns an access token. Wrong password, unknown email and deactivated
+        accounts all return the same 401 response.
       security: []
       requestBody:
         required: true
@@ -88,12 +115,34 @@ paths:
           description: Token and user
           content:
             application/json:
-              example: { token: '<jwt>', user: { id: '6650a1', name: Mara Jensen, role: customer } }
-        '401':
-          description: Wrong email or password (INVALID_CREDENTIALS, always the same message)
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+              example:
+                token: '<jwt>'
+                user:
+                  id: 6650a1f2c3d4e5f6a7b8c9d0
+                  name: Mara Jensen
+                  email: mara@example.com
+                  role: customer
+                  isActive: true
+                  createdAt: '2026-12-01T09:00:00.000Z'
+                  updatedAt: '2026-12-01T09:00:00.000Z'
+        '400':
+          description: Missing or malformed fields (VALIDATION_ERROR)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: Some fields are invalid
+                  details: [ { field: password, message: Password is required } ]
+        '401':
+          description: Wrong email or password, or deactivated account (INVALID_CREDENTIALS, always the same message)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: INVALID_CREDENTIALS, message: Invalid email or password }
         '429':
           description: Too many login attempts
 
@@ -440,15 +489,23 @@ components:
       type: object
       required: [name, email, password]
       properties:
-        name: { type: string, maxLength: 80 }
-        email: { type: string, format: email }
-        password: { type: string, minLength: 10 }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, minLength: 8, description: At most 72 bytes (bcrypt limit) }
     LoginRequest:
       type: object
       required: [email, password]
       properties:
         email: { type: string, format: email }
         password: { type: string }
+    AuthResponse:
+      type: object
+      required: [user, token]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        token:
+          type: string
+          description: JWT access token with `sub` (user id) and `role`; expires after JWT_EXPIRES_IN (default 1h)
     User:
       type: object
       properties:
@@ -457,6 +514,8 @@ components:
         email: { type: string, format: email }
         role: { $ref: '#/components/schemas/Role' }
         isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     TicketCreate:
       type: object
       required: [title, description]
