@@ -20,7 +20,7 @@ ClinicDesk gives them one place to create, track, and resolve tickets.
 ## Tech stack
 **In use:** React, Vite, Node.js, Express, Jest, Supertest, Vitest, ESLint, Prettier, GitHub Actions
 
-**Planned:** MongoDB Atlas, Tailwind CSS, Playwright, Vercel, Render, Sentry
+**Planned:** MongoDB Atlas data integration, Tailwind CSS, Playwright, Sentry
 
 ## Getting started
 
@@ -43,6 +43,8 @@ npm run dev
 
 The client runs at <http://localhost:5173>; the API health check is at
 <http://localhost:3000/health>.
+The client requests `/api/v1/hello` through the Vite development proxy. Start the
+server before opening the client to see its API greeting.
 
 Run checks from each app folder:
 
@@ -60,6 +62,16 @@ npm run build
 GitHub Actions runs the server lint and tests and the client lint, tests, and build
 on pull requests targeting `main` and pushes to `main`.
 
+## Staging
+
+The client and server are deployed separately. Set these environment variables in each service (never commit real values):
+
+| Where | Variable | Value |
+|---|---|---|
+| Vercel (client) | `VITE_API_URL`  | The Render API URL, no trailing slash 	   |
+| Render (server) | `CLIENT_ORIGIN` | The Vercel URL, no trailing slash 		   |
+| Render (server) | `MONGODB_URI` 	| The MongoDB Atlas connection string (secret) |
+
 ## API and data model
 
 - Base URL (local): `http://localhost:3000/api/v1`
@@ -76,3 +88,28 @@ In development. Sprint 0 (foundation) in progress.
 
 ## Live demo
 Coming soon
+
+## Staging deployment
+
+The staging topology is MongoDB Atlas Free, Render for the API, and Vercel for
+the client. The API deployment is described by [`render.yaml`](render.yaml).
+
+1. Create an Atlas free cluster and database user. Add the Render outbound
+	network access as allowed by your Atlas IP access list; for a free Render
+	instance without stable outbound IPs, Atlas may require `0.0.0.0/0`. Use a
+	strong database password and keep the connection string private.
+2. In Render, create a Blueprint from this repository and set `MONGODB_URI` to
+	the Atlas connection string and `CLIENT_ORIGIN` to the final Vercel origin
+	(for example, `https://clinicdesk.vercel.app`). The API health check is
+	`/health`; its hello endpoint is `/api/v1/hello`.
+3. In Vercel, import the repository with `client` as the Root Directory. Set
+	`VITE_API_URL` to the Render API origin (for example,
+	`https://clinicdesk-api.onrender.com`) for the Preview and Production
+	environments, then deploy.
+4. Open the Vercel deployment. The page should show `Hello from ClinicDesk API`,
+	confirming the frontend can reach the deployed backend.
+
+The Atlas connection string is staged for future database integration; the
+current application does not yet connect to MongoDB. Configure secrets only in
+the hosting dashboards, never in committed files. Render's free web service can
+sleep when idle, so the first request after inactivity may take longer.

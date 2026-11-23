@@ -30,6 +30,22 @@ paths:
             application/json:
               example: { status: ok }
 
+  /hello:
+    get:
+      summary: Staging connectivity check
+      security: []
+      responses:
+        '200':
+          description: API greeting for the deployed frontend
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
+              example: { message: Hello from ClinicDesk API }
+
   /auth/register:
     post:
       tags: [Auth]
