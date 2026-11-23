@@ -1,0 +1,34 @@
+/* ClinicDesk design tokens. See docs/design-tokens.md. */
+:root {
+  /* Palette */
+  --color-cream: #ebebd8; /* page background */
+  --color-paper: #f6f6ea; /* cards */
+  --color-olive: #455230; /* text, top bar */
+  --color-green: #637545; /* primary buttons, input borders */
+  --color-sage: #9ba685; /* decorative borders only, never text */
+  --color-white: #ffffff; /* text on primary buttons */
+
+  /* Status tints (background / text) */
+  --color-status-open-bg: #dce2ea;
+  --color-status-open-text: #3b4a5e;
+  --color-status-in-progress-bg: #d5dec6;
+  --color-status-in-progress-text: #364228;
+  --color-status-waiting-bg: #f3e2b8;
+  --color-status-waiting-text: #6b4a00;
+
+  /* Priority tints (background / text) */
+  --color-priority-normal-bg: #dce2ea;
+  --color-priority-normal-text: #3b4a5e;
+  --color-priority-high-bg: #f3e2b8;
+  --color-priority-high-text: #6b4a00;
+  --color-priority-urgent-bg: #f2d3cc;
+  --color-priority-urgent-text: #8a2b1b;
+
+  /* Typography */
+  --font-heading: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-body: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+  --font-weight-heading: 700;
+}
