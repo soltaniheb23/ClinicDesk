@@ -1,4 +1,5 @@
 const express = require('express');
+const authRouter = require('./routes/auth');
 
 const app = express();
 const clientOrigin = (process.env.CLIENT_ORIGIN || '').replace(/\/+$/, '');
@@ -18,12 +19,30 @@ app.use((request, response, next) => {
   next();
 });
 
+app.use(express.json({ limit: '10kb' }));
+
 app.get('/health', (_request, response) => {
   response.json({ status: 'ok' });
 });
 
 app.get('/api/v1/hello', (_request, response) => {
   response.json({ message: 'Hello from ClinicDesk API' });
+});
+
+app.use('/api/v1/auth', authRouter);
+
+// eslint-disable-next-line no-unused-vars
+app.use((error, _request, response, _next) => {
+  if (error.type === 'entity.parse.failed') {
+    return response.status(400).json({
+      error: { code: 'VALIDATION_ERROR', message: 'Request body must be valid JSON' },
+    });
+  }
+
+  console.error(error);
+  return response.status(500).json({
+    error: { code: 'INTERNAL_ERROR', message: 'Something went wrong' },
+  });
 });
 
 module.exports = app;
