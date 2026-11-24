@@ -7,6 +7,15 @@ export function formatDate(value) {
   return `${day}.${month}.${date.getFullYear()}`;
 }
 
+// dd.mm.yyyy, hh:mm (24-hour) in the viewer's time zone, for comment timestamps.
+export function formatDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${formatDate(date)}, ${hours}:${minutes}`;
+}
+
 // Reads ?page= from the URL; anything that is not a whole number of at least 1 means page 1.
 export function pageFromSearch(searchParams) {
   const page = Number(searchParams.get('page'));

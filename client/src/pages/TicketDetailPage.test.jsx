@@ -47,8 +47,13 @@ describe('TicketDetailPage', () => {
     expect(screen.getByRole('link', { name: 'Back to tickets' }).getAttribute('href')).toBe(
       '/tickets',
     );
-    // A customer on an open ticket gets no controls: the only button is the header's Log out.
-    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Log out']);
+    // A customer on an open ticket gets no status or assignment controls; the only other
+    // button is the comment form's.
+    expect(await screen.findByText('No comments yet.')).toBeTruthy();
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Log out',
+      'Post comment',
+    ]);
 
     expect(fetchMock.mock.calls[0][0]).toBe(`/api/v1/tickets/${ticket.id}`);
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer jwt-token');

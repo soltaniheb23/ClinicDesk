@@ -36,6 +36,16 @@ Each badge uses a light tint background with dark text of the same hue.
 Open and normal share the neutral blue-grey; waiting and high share amber.
 Badges always carry a text label, so color is never the only signal.
 
+## Internal notes
+
+| Token | Value | Use |
+|---|---|---|
+| `--color-internal-bg` | `#faf1da` | Background of internal-note comments (olive text: 7.46:1) |
+| `--color-internal-badge-bg` | waiting tint `#f3e2b8` | "Internal note" badge background |
+| `--color-internal-badge-text` | waiting text `#6b4a00` | Badge text (6.29:1) and the note's left border |
+
+Internal notes always carry the "Internal note" text badge, so color is never the only signal.
+
 ## Feedback colors
 
 | Token | Value | Use |

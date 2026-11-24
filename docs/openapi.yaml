@@ -551,20 +551,63 @@ paths:
   /tickets/{id}/comments:
     get:
       tags: [Comments]
-      summary: List comments (internal notes hidden from customers)
+      summary: List comments, oldest first (internal notes hidden from customers)
+      description: >
+        Same visibility rule as GET /tickets/{id}: an invalid id, an unknown ticket and
+        another customer's ticket all return the same 404. Customers never receive
+        internal notes (they are filtered out in the database query). Authors are
+        `{ id, name, role }` only. See docs/comments.md.
       parameters: [ { $ref: '#/components/parameters/TicketId' } ]
       responses:
         '200':
-          description: Comments in chronological order
+          description: Comments in chronological order (oldest first)
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: '#/components/schemas/Comment' }
-        '404': { $ref: '#/components/responses/NotFound' }
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Comment' }
+              example:
+                items:
+                  - id: 6652a1b2c3d4e5f6a7b8c9e1
+                    ticket: 6651b2a7c3d4e5f6a7b8c9d1
+                    author: { id: 6650a1f2c3d4e5f6a7b8c9d0, name: Mara Jensen, role: customer }
+                    body: It is still broken.
+                    internal: false
+                    createdAt: '2026-12-01T09:20:00.000Z'
+                  - id: 6652a1b2c3d4e5f6a7b8c9e2
+                    ticket: 6651b2a7c3d4e5f6a7b8c9d1
+                    author: { id: 6650c3a1b2c3d4e5f6a7b8c9, name: Lena Berg, role: agent }
+                    body: We are replacing the toner today.
+                    internal: false
+                    createdAt: '2026-12-01T09:40:00.000Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: Ticket not found, not visible to this user, or invalid id (NOT_FOUND)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: NOT_FOUND, message: Ticket not found }
     post:
       tags: [Comments]
-      summary: Add a comment
+      summary: Add a comment (customer on own ticket, agent, admin)
+      description: >
+        `author`, `ticket` and `createdAt` are set by the server; unknown keys are
+        ignored. Only agents and admins may send `internal: true`.
+
+
+        Checks run in this order: 404 (invalid id, unknown ticket, or another
+        customer's ticket) → 400 (invalid body) → 403 (a customer sends
+        `internal: true`) → 409 TICKET_CLOSED.
+
+
+        The first non-internal comment by an agent or admin sets the ticket's
+        `firstResponseAt` (only while it is null). Internal notes and customer comments
+        never set it.
       parameters: [ { $ref: '#/components/parameters/TicketId' } ]
       requestBody:
         required: true
@@ -574,17 +617,59 @@ paths:
               type: object
               required: [body]
               properties:
-                body: { type: string, maxLength: 2000 }
-                isInternal: { type: boolean, default: false }
-            example: { body: We are replacing the toner today., isInternal: false }
+                body: { type: string, minLength: 1, maxLength: 2000, description: Trimmed before validation }
+                internal: { type: boolean, default: false, description: Agents and admins only }
+            example: { body: We are replacing the toner today., internal: false }
       responses:
         '201':
           description: Created
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Comment' }
-        '400': { $ref: '#/components/responses/ValidationError' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema:
+                type: object
+                required: [comment]
+                properties:
+                  comment: { $ref: '#/components/schemas/Comment' }
+              example:
+                comment:
+                  id: 6652a1b2c3d4e5f6a7b8c9e2
+                  ticket: 6651b2a7c3d4e5f6a7b8c9d1
+                  author: { id: 6650c3a1b2c3d4e5f6a7b8c9, name: Lena Berg, role: agent }
+                  body: We are replacing the toner today.
+                  internal: false
+                  createdAt: '2026-12-01T09:40:00.000Z'
+        '400':
+          description: Invalid body (VALIDATION_ERROR)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: Some fields are invalid
+                  details: [ { field: body, message: Comment must be at most 2000 characters } ]
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: "FORBIDDEN. A customer sent `internal: true`."
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: FORBIDDEN, message: You do not have permission to do this }
+        '404':
+          description: Ticket not found, not visible to this user, or invalid id (NOT_FOUND)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: NOT_FOUND, message: Ticket not found }
+        '409':
+          description: TICKET_CLOSED. Closed tickets accept no comments.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: TICKET_CLOSED, message: A closed ticket does not accept comments }
 
   /tickets/{id}/attachments:
     post:
@@ -890,12 +975,24 @@ components:
         resolvedAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-    Comment:
+    CommentAuthor:
       type: object
+      description: A comment author. Never includes email or passwordHash.
+      required: [id, name, role]
       properties:
         id: { type: string }
-        ticket: { type: string }
-        author: { type: string }
-        body: { type: string }
-        isInternal: { type: boolean }
+        name: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+    Comment:
+      type: object
+      required: [id, ticket, author, body, internal, createdAt]
+      properties:
+        id: { type: string }
+        ticket: { type: string, description: Ticket id }
+        author:
+          description: null if the author's account was deleted
+          allOf: [ { $ref: '#/components/schemas/CommentAuthor' } ]
+          nullable: true
+        body: { type: string, maxLength: 2000 }
+        internal: { type: boolean, description: Internal notes are never sent to customers }
         createdAt: { type: string, format: date-time }

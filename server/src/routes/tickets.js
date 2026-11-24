@@ -1,6 +1,7 @@
 const express = require('express');
 const { z } = require('zod');
 const mongoose = require('mongoose');
+const Comment = require('../models/Comment');
 const Ticket = require('../models/Ticket');
 const User = require('../models/User');
 const { authenticate } = require('../auth/authenticate');
@@ -86,6 +87,31 @@ const assigneeChangeSchema = z.object({
     { error: 'Assignee must be a user id or null' },
   ),
 });
+
+// Unknown keys (author, createdAt, ticket, ...) are stripped: the server sets those.
+const createCommentSchema = z.object({
+  body: z
+    .string({ error: 'Comment is required' })
+    .trim()
+    .min(1, { error: 'Comment is required' })
+    .max(2000, { error: 'Comment must be at most 2000 characters' }),
+  internal: z.boolean({ error: 'Internal must be true or false' }).default(false),
+});
+
+// Comment authors also show their role (for the "Agent" / "Customer" label); never email.
+const COMMENT_AUTHOR_FIELDS = 'name role';
+
+function serializeComment(comment) {
+  const { author } = comment;
+  return {
+    id: comment._id.toString(),
+    ticket: comment.ticket.toString(),
+    author: author ? { id: author._id.toString(), name: author.name, role: author.role } : null,
+    body: comment.body,
+    internal: comment.internal,
+    createdAt: comment.createdAt,
+  };
+}
 
 const FORBIDDEN = {
   error: { code: 'FORBIDDEN', message: 'You do not have permission to do this' },
@@ -297,6 +323,65 @@ router.patch('/:id/assignee', async (request, response) => {
   }
 
   return response.json({ ticket: serializeTicketFor(updated, user) });
+});
+
+// Comment thread (docs/comments.md). Same visibility rule as the ticket itself.
+router.get('/:id/comments', async (request, response) => {
+  const ticket = await findVisibleTicket(request);
+  if (!ticket) return response.status(404).json(NOT_FOUND);
+
+  // Customers never receive internal notes: they are filtered out by the query itself.
+  const filter = { ticket: ticket._id };
+  if (!STAFF_ROLES.includes(request.user.role)) filter.internal = false;
+
+  const comments = await Comment.find(filter)
+    .sort({ createdAt: 1, _id: 1 })
+    .populate('author', COMMENT_AUTHOR_FIELDS)
+    .lean();
+
+  return response.json({ items: comments.map(serializeComment) });
+});
+
+// Checks, in order: 404 not visible -> 400 bad body -> 403 customer asks for an internal
+// note -> 409 ticket is closed.
+router.post('/:id/comments', async (request, response) => {
+  const ticket = await findVisibleTicket(request);
+  if (!ticket) return response.status(404).json(NOT_FOUND);
+
+  const parsed = createCommentSchema.safeParse(request.body ?? {});
+  if (!parsed.success) return validationError(response, parsed.error);
+
+  const { user } = request;
+  const isStaff = STAFF_ROLES.includes(user.role);
+  if (parsed.data.internal && !isStaff) return response.status(403).json(FORBIDDEN);
+
+  if (ticket.status === 'closed') {
+    return response.status(409).json({
+      error: { code: 'TICKET_CLOSED', message: 'A closed ticket does not accept comments' },
+    });
+  }
+
+  const created = await Comment.create({
+    ticket: ticket._id,
+    author: user.id,
+    body: parsed.data.body,
+    internal: parsed.data.internal,
+  });
+
+  // The first public staff reply starts the SLA clock (CD-22). The filter makes this a
+  // no-op once firstResponseAt is set, even with two replies at the same time.
+  if (isStaff && !created.internal) {
+    await Ticket.findOneAndUpdate(
+      { _id: ticket._id, firstResponseAt: null },
+      { $set: { firstResponseAt: created.createdAt } },
+    );
+  }
+
+  const comment = await Comment.findById(created._id)
+    .populate('author', COMMENT_AUTHOR_FIELDS)
+    .lean();
+
+  return response.status(201).json({ comment: serializeComment(comment) });
 });
 
 module.exports = router;

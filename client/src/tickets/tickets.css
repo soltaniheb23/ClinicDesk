@@ -326,3 +326,117 @@
   padding: 0;
   border: 0;
 }
+
+/* Comment thread (wireframe 03). */
+.comments {
+  max-width: 830px;
+  margin-top: var(--space-6);
+}
+
+.comments h2 {
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-heading);
+  font-size: 1.1rem;
+}
+
+.comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  list-style: none;
+}
+
+.comment {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-sage);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+}
+
+.comment-internal {
+  border-left: 4px solid var(--color-internal-badge-text);
+  background: var(--color-internal-bg);
+}
+
+.comment-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.comment-author {
+  font-weight: var(--font-weight-bold);
+}
+
+.comment-role,
+.comment-time {
+  font-size: 0.875rem;
+}
+
+.comment-time {
+  margin-left: auto;
+}
+
+.comment-body {
+  margin: 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.badge-internal {
+  background: var(--color-internal-badge-bg);
+  color: var(--color-internal-badge-text);
+}
+
+.comments-empty,
+.comments-closed {
+  margin: 0 0 var(--space-5);
+}
+
+.comments-closed {
+  font-style: italic;
+}
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-sage);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+}
+
+.comment-form textarea {
+  resize: vertical;
+}
+
+.comment-counter {
+  margin-top: calc(-1 * var(--space-2));
+  text-align: right;
+}
+
+.comment-internal-toggle {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: var(--size-touch-target);
+}
+
+.comment-internal-toggle input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-green);
+}
+
+.comment-form .button-primary {
+  align-self: flex-start;
+  width: auto;
+  padding: var(--space-2) var(--space-5);
+}
