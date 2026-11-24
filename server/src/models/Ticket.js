@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
+const { STATUSES } = require('../tickets/statusWorkflow');
 
 const CATEGORIES = ['it', 'facility', 'account', 'other'];
 const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
-const STATUSES = ['open', 'in_progress', 'waiting', 'resolved', 'closed'];
 
 const ticketSchema = new mongoose.Schema(
   {

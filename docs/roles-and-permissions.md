@@ -28,7 +28,7 @@ target behaviour for them.
 | Comment on a ticket | Own tickets | All | All |
 | Write and read internal notes | No | Yes | Yes |
 | Upload and download attachments | Own tickets | All | All |
-| Change ticket status | Close own resolved ticket | Yes | Yes |
+| Change ticket status ([workflow](status-workflow.md)) | Close own resolved ticket | Yes | Yes |
 | Assign or claim a ticket | No | Yes | Yes |
 | Manage users (create, change role, deactivate) | No | No | Yes |
 | View audit log | No | No | Yes |

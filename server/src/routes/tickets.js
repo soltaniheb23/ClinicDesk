@@ -5,6 +5,12 @@ const Ticket = require('../models/Ticket');
 const { authenticate } = require('../auth/authenticate');
 const { canAccessOwnedResource } = require('../auth/authorize');
 const { validationError } = require('../validation');
+const {
+  STATUSES,
+  allowedNextStatuses,
+  canTransition,
+  isWorkflowTransition,
+} = require('../tickets/statusWorkflow');
 
 const router = express.Router();
 
@@ -47,6 +53,26 @@ function serializeTicket(ticket) {
     updatedAt: ticket.updatedAt,
   };
 }
+
+// Detail-style response: the ticket plus the statuses this user may move it to next.
+function serializeTicketFor(ticket, user) {
+  return {
+    ...serializeTicket(ticket),
+    allowedNextStatuses: allowedNextStatuses(ticket.status, user.role),
+  };
+}
+
+const STATUS_LABELS = {
+  open: 'Open',
+  in_progress: 'In progress',
+  waiting: 'Waiting',
+  resolved: 'Resolved',
+  closed: 'Closed',
+};
+
+const statusChangeSchema = z.object({
+  status: z.enum(STATUSES, { error: `Status must be one of: ${STATUSES.join(', ')}` }),
+});
 
 function withPublicUsers(query) {
   return query
@@ -118,21 +144,78 @@ router.get('/', async (request, response) => {
   });
 });
 
-// An invalid id, an unknown ticket and another customer's ticket all get the same 404, so
-// the response never reveals that a ticket exists.
-router.get('/:id', async (request, response) => {
-  if (!mongoose.isValidObjectId(request.params.id)) {
-    return response.status(404).json(NOT_FOUND);
-  }
+// Returns the ticket if this user may see it, otherwise null. An invalid id, an unknown
+// ticket and another customer's ticket are treated the same, so a 404 never reveals that a
+// ticket exists.
+async function findVisibleTicket(request) {
+  if (!mongoose.isValidObjectId(request.params.id)) return null;
 
   const ticket = await withPublicUsers(Ticket.findById(request.params.id));
-  const ownerId = ticket?.createdBy?._id;
+  if (!ticket || !canAccessOwnedResource(request.user, ticket.createdBy?._id)) return null;
 
-  if (!ticket || !canAccessOwnedResource(request.user, ownerId)) {
-    return response.status(404).json(NOT_FOUND);
+  return ticket;
+}
+
+router.get('/:id', async (request, response) => {
+  const ticket = await findVisibleTicket(request);
+  if (!ticket) return response.status(404).json(NOT_FOUND);
+
+  return response.json({ ticket: serializeTicketFor(ticket, request.user) });
+});
+
+// Status workflow (docs/status-workflow.md). Checks, in order:
+// 404 not visible -> 400 bad body -> 403 customer asks for a staff-only transition ->
+// 409 not a workflow transition (including "same status" and anything from closed).
+router.patch('/:id/status', async (request, response) => {
+  const ticket = await findVisibleTicket(request);
+  if (!ticket) return response.status(404).json(NOT_FOUND);
+
+  const parsed = statusChangeSchema.safeParse(request.body ?? {});
+  if (!parsed.success) return validationError(response, parsed.error);
+
+  const currentStatus = ticket.status;
+  const nextStatus = parsed.data.status;
+  const { role } = request.user;
+
+  if (!canTransition(currentStatus, nextStatus, role)) {
+    if (role === 'customer' && isWorkflowTransition(currentStatus, nextStatus)) {
+      return response.status(403).json({
+        error: { code: 'FORBIDDEN', message: 'You do not have permission to do this' },
+      });
+    }
+
+    return response.status(409).json({
+      error: {
+        code: 'INVALID_TRANSITION',
+        message: `Cannot change status from ${STATUS_LABELS[currentStatus]} to ${STATUS_LABELS[nextStatus]}`,
+      },
+    });
   }
 
-  return response.json({ ticket: serializeTicket(ticket) });
+  const update = { status: nextStatus };
+  if (nextStatus === 'resolved') update.resolvedAt = new Date();
+  if (currentStatus === 'resolved' && nextStatus === 'in_progress') update.resolvedAt = null;
+  // firstResponseAt is left alone: the first agent comment sets it (CD-14).
+
+  // Only applies if nobody changed the status since we read it.
+  const updated = await withPublicUsers(
+    Ticket.findOneAndUpdate(
+      { _id: ticket._id, status: currentStatus },
+      { $set: update },
+      { returnDocument: 'after', runValidators: true },
+    ),
+  );
+
+  if (!updated) {
+    return response.status(409).json({
+      error: {
+        code: 'STATUS_CONFLICT',
+        message: 'The status was changed by someone else. Reload the ticket and try again.',
+      },
+    });
+  }
+
+  return response.json({ ticket: serializeTicketFor(updated, request.user) });
 });
 
 module.exports = router;
