@@ -2,7 +2,10 @@ openapi: 3.0.3
 info:
   title: ClinicDesk API
   version: 1.0.0
-  description: Helpdesk API for a clinic. Draft contract for ticket CD-5.
+  description: >
+    Helpdesk API for a clinic. Draft contract for ticket CD-5. Endpoints need a
+    bearer token unless they set `security: []`; role rules are in
+    docs/roles-and-permissions.md.
 servers:
   - url: http://localhost:3000/api/v1
     description: Local development
@@ -150,12 +153,30 @@ paths:
     get:
       tags: [Auth]
       summary: Current user
+      description: >
+        Returns the user behind the bearer token. The role and active flag are read
+        from the database, so a role change or deactivation applies immediately.
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: The logged-in user
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/User' }
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+              example:
+                user:
+                  id: 6650a1f2c3d4e5f6a7b8c9d0
+                  name: Mara Jensen
+                  email: mara@example.com
+                  role: customer
+                  isActive: true
+                  createdAt: '2026-12-01T09:00:00.000Z'
+                  updatedAt: '2026-12-01T09:00:00.000Z'
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /tickets:
@@ -438,6 +459,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: >
+        Send `Authorization: Bearer <token>` with the token from /auth/login or
+        /auth/register. The server checks the signature (HS256) and expiry, then loads
+        the user: the role in the token is not trusted, and deactivated or deleted
+        users are rejected. See docs/roles-and-permissions.md.
   parameters:
     TicketId:
       name: id
@@ -446,15 +472,24 @@ components:
       schema: { type: string }
   responses:
     Unauthorized:
-      description: Not logged in or invalid token
+      description: >
+        UNAUTHENTICATED. The token is missing, malformed, expired or wrongly signed,
+        or the user is deactivated or deleted. All cases return the same body.
+      headers:
+        WWW-Authenticate:
+          schema: { type: string, example: Bearer }
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: { code: UNAUTHENTICATED, message: Authentication required }
     Forbidden:
-      description: Not allowed for this role
+      description: FORBIDDEN. Logged in, but the user's role is not allowed to do this.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: { code: FORBIDDEN, message: You do not have permission to do this }
     NotFound:
       description: Not found (also used for tickets the user must not see)
       content:

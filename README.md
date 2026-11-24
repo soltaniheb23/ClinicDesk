@@ -80,6 +80,7 @@ The client and server are deployed separately. Set these environment variables i
 - Base URL (local): `http://localhost:3000/api/v1`
 - API contract (OpenAPI 3): [`docs/openapi.yaml`](docs/openapi.yaml)
 - Data model (ER diagram): [`docs/er-diagram.md`](docs/er-diagram.md)
+- Roles and permissions: [`docs/roles-and-permissions.md`](docs/roles-and-permissions.md)
 
 To view the API contract as interactive documentation, paste `docs/openapi.yaml` into [Swagger Editor](https://editor.swagger.io).
 
