@@ -10,8 +10,8 @@ app.use((request, response, next) => {
     response.vary('Origin');
 
     if (request.method === 'OPTIONS') {
-      response.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-      response.set('Access-Control-Allow-Headers', 'Content-Type');
+      response.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+      response.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       return response.sendStatus(204);
     }
   }
