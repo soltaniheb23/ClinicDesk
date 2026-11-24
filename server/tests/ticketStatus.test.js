@@ -84,13 +84,13 @@ function changeStatus(token, id, body) {
     .send(body);
 }
 
-describe('PATCH /api/v1/tickets/:id/status as staff', () => {
-  it.each(ALLOWED)('lets an agent move %s -> %s', async (from, to) => {
+describe.each(['agent', 'admin'])('PATCH /api/v1/tickets/:id/status as an %s', (role) => {
+  it.each(ALLOWED)('allows %s -> %s', async (from, to) => {
     const customer = await createUser();
-    const agent = await createUser('agent');
+    const staff = await createUser(role);
     const ticket = await createTicket(customer.user, { status: from });
 
-    const response = await changeStatus(agent.token, ticket.id, { status: to });
+    const response = await changeStatus(staff.token, ticket.id, { status: to });
 
     expect(response.status).toBe(200);
     expect(response.body.ticket.status).toBe(to);
@@ -99,10 +99,10 @@ describe('PATCH /api/v1/tickets/:id/status as staff', () => {
 
   it.each(notAllowed)('returns 409 for %s -> %s', async (from, to) => {
     const customer = await createUser();
-    const agent = await createUser('agent');
+    const staff = await createUser(role);
     const ticket = await createTicket(customer.user, { status: from });
 
-    const response = await changeStatus(agent.token, ticket.id, { status: to });
+    const response = await changeStatus(staff.token, ticket.id, { status: to });
 
     expect(response.status).toBe(409);
     expect(response.body).toEqual({
@@ -114,25 +114,15 @@ describe('PATCH /api/v1/tickets/:id/status as staff', () => {
     expect((await Ticket.findById(ticket.id)).status).toBe(from);
   });
 
-  it('lets an admin change any ticket', async () => {
+  it('may change a ticket assigned to someone else', async () => {
     const customer = await createUser();
-    const admin = await createUser('admin');
-    const ticket = await createTicket(customer.user);
+    const staff = await createUser(role);
+    const other = await createUser('agent');
+    const ticket = await createTicket(customer.user, { assignee: other.user._id });
 
-    const response = await changeStatus(admin.token, ticket.id, { status: 'in_progress' });
+    const response = await changeStatus(staff.token, ticket.id, { status: 'in_progress' });
 
     expect(response.status).toBe(200);
-  });
-
-  it.each(STATUSES)('does not allow closed -> %s', async (to) => {
-    const customer = await createUser();
-    const admin = await createUser('admin');
-    const ticket = await createTicket(customer.user, { status: 'closed' });
-
-    const response = await changeStatus(admin.token, ticket.id, { status: to });
-
-    expect(response.status).toBe(409);
-    expect(response.body.error.code).toBe('INVALID_TRANSITION');
   });
 });
 
@@ -213,6 +203,20 @@ describe('PATCH /api/v1/tickets/:id/status validation and order of checks', () =
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
     expect(response.body.error.details[0].field).toBe('status');
+  });
+
+  it('returns 400 for a request without a body', async () => {
+    const customer = await createUser();
+    const agent = await createUser('agent');
+    const ticket = await createTicket(customer.user);
+
+    const response = await request(app)
+      .patch(`/api/v1/tickets/${ticket.id}/status`)
+      .set('Authorization', `Bearer ${agent.token}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.details[0].field).toBe('status');
+    expect((await Ticket.findById(ticket.id)).status).toBe('open');
   });
 
   it("checks visibility before the body: a bad body on another customer's ticket is 404", async () => {

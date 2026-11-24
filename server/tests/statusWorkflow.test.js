@@ -52,6 +52,8 @@ describe('statusWorkflow', () => {
     expect(allowedNextStatuses('open', 'guest')).toEqual([]);
     expect(allowedNextStatuses('archived', 'admin')).toEqual([]);
     expect(canTransition('open', 'in_progress', undefined)).toBe(false);
+    expect(isWorkflowTransition('archived', 'open')).toBe(false);
+    expect(isWorkflowTransition('open', 'archived')).toBe(false);
   });
 
   it('cannot be changed by callers', () => {

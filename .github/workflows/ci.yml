@@ -10,9 +10,11 @@ permissions:
   contents: read
 
 jobs:
+  # The name is a required status check in the protect-main ruleset. Renaming it blocks every PR.
   server:
     name: Server (lint + test)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: ./server
@@ -33,12 +35,41 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
-        run: npm test
+      # Fails the job if coverage drops below the threshold in server/package.json.
+      # shell: bash adds pipefail, so a failing test or threshold still fails the step.
+      - name: Test with coverage
+        shell: bash
+        run: npm run test:coverage | tee coverage-output.txt
+
+      # Show the text-summary table on the workflow run page, even when tests fail.
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          {
+            echo '## Server coverage'
+            echo
+            echo '```'
+            grep -E '^(Statements|Branches|Functions|Lines) +:' coverage-output.txt \
+              || echo 'No coverage summary (the test run did not finish).'
+            echo '```'
+            echo
+            echo 'Threshold: 80% for each (server/package.json). Full report: the server-coverage artifact (open lcov-report/index.html).'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: server-coverage
+          path: server/coverage/
+          retention-days: 14
+          if-no-files-found: warn
 
   client:
     name: Client (lint + test + build)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: ./client

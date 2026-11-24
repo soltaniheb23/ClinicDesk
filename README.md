@@ -62,8 +62,30 @@ The client also has a production build:
 npm run build
 ```
 
-GitHub Actions runs the server lint and tests and the client lint, tests, and build
-on pull requests targeting `main` and pushes to `main`.
+GitHub Actions runs the server lint and tests (with coverage) and the client lint,
+tests, and build on pull requests targeting `main` and pushes to `main`.
+
+## Testing and coverage
+
+Server tests use Jest, Supertest and an in-memory MongoDB (mongodb-memory-server), so no
+database or `.env` is needed:
+
+```sh
+cd server
+npm test               # all tests
+npm run test:coverage  # same tests plus a coverage report in server/coverage/
+```
+
+`npm run test:coverage` prints a summary and a per-file table, and writes an HTML report
+to `server/coverage/lcov-report/index.html`. It fails if statements, branches, functions
+or lines drop below **80%** (`coverageThreshold` in `server/package.json`). `src/server.js`
+is left out because it only starts the listener.
+
+In CI, the server job runs `npm run test:coverage`. The summary table is shown on the
+workflow run's **Summary** page, and the full report is attached as the
+**server-coverage** artifact (kept for 14 days).
+
+The client tests use Vitest and Testing Library: `cd client && npm test`.
 
 ## Staging
 
