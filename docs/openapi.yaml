@@ -303,7 +303,7 @@ paths:
                 type: object
                 required: [ticket]
                 properties:
-                  ticket: { $ref: '#/components/schemas/Ticket' }
+                  ticket: { $ref: '#/components/schemas/TicketDetail' }
               example:
                 ticket:
                   id: 6651b2a7c3d4e5f6a7b8c9d1
@@ -318,6 +318,7 @@ paths:
                   resolvedAt: null
                   createdAt: '2026-12-01T09:15:00.000Z'
                   updatedAt: '2026-12-01T09:40:00.000Z'
+                  allowedNextStatuses: [waiting, resolved]
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404':
           description: Ticket not found, not visible to this user, or invalid id (NOT_FOUND)
@@ -331,6 +332,24 @@ paths:
     patch:
       tags: [Tickets]
       summary: Change status (agent, admin; customer may close own resolved ticket)
+      description: >
+        Follows docs/status-workflow.md. Allowed: open → in_progress;
+        in_progress → waiting, resolved; waiting → in_progress, resolved;
+        resolved → closed, in_progress (reopen); closed is final. Agents and admins may
+        make any allowed change on any ticket; a customer may only change their own
+        resolved ticket to closed.
+
+
+        Checks run in this order: 404 (invalid id, unknown ticket, or another
+        customer's ticket; same body as GET /tickets/{id}) → 400 (invalid body) →
+        403 (a customer asks for a change that only agents and admins may make) →
+        409 INVALID_TRANSITION (not a workflow change, including the same status and
+        anything from closed). If the status changes between reading and saving, the
+        update is not applied and 409 STATUS_CONFLICT is returned.
+
+
+        Moving to resolved sets `resolvedAt`; reopening (resolved → in_progress)
+        clears it. `firstResponseAt` is not changed here.
       parameters: [ { $ref: '#/components/parameters/TicketId' } ]
       requestBody:
         required: true
@@ -344,17 +363,75 @@ paths:
             example: { status: in_progress }
       responses:
         '200':
-          description: Updated ticket
+          description: Updated ticket, with the next statuses this user may choose
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Ticket' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409':
-          description: Invalid status change (INVALID_STATUS_TRANSITION)
+              schema:
+                type: object
+                required: [ticket]
+                properties:
+                  ticket: { $ref: '#/components/schemas/TicketDetail' }
+              example:
+                ticket:
+                  id: 6651b2a7c3d4e5f6a7b8c9d1
+                  title: Printer in reception not working
+                  description: It shows error E-12 since this morning.
+                  category: it
+                  priority: high
+                  status: in_progress
+                  createdBy: { id: 6650a1f2c3d4e5f6a7b8c9d0, name: Mara Jensen }
+                  assignee: null
+                  firstResponseAt: null
+                  resolvedAt: null
+                  createdAt: '2026-12-01T09:15:00.000Z'
+                  updatedAt: '2026-12-01T09:40:00.000Z'
+                  allowedNextStatuses: [waiting, resolved]
+        '400':
+          description: Missing or unknown status value (VALIDATION_ERROR)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: Some fields are invalid
+                  details:
+                    - field: status
+                      message: 'Status must be one of: open, in_progress, waiting, resolved, closed'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: >
+            FORBIDDEN. Only for customers asking for a workflow change reserved for
+            agents and admins (for example open → in_progress on their own ticket).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: FORBIDDEN, message: You do not have permission to do this }
+        '404':
+          description: Ticket not found, not visible to this user, or invalid id (NOT_FOUND)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: NOT_FOUND, message: Ticket not found }
+        '409':
+          description: >
+            INVALID_TRANSITION when the change is not in the workflow (same status,
+            from closed, or skipping steps); STATUS_CONFLICT when the status changed
+            between reading and saving.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                invalidTransition:
+                  value:
+                    error: { code: INVALID_TRANSITION, message: Cannot change status from Open to Closed }
+                conflict:
+                  value:
+                    error:
+                      code: STATUS_CONFLICT
+                      message: The status was changed by someone else. Reload the ticket and try again.
 
   /tickets/{id}/assignee:
     patch:
@@ -637,6 +714,20 @@ components:
       properties:
         id: { type: string }
         name: { type: string }
+    TicketDetail:
+      description: A ticket as returned by GET /tickets/{id} and PATCH /tickets/{id}/status.
+      allOf:
+        - $ref: '#/components/schemas/Ticket'
+        - type: object
+          required: [allowedNextStatuses]
+          properties:
+            allowedNextStatuses:
+              type: array
+              items: { $ref: '#/components/schemas/Status' }
+              description: >
+                Statuses the current user may move this ticket to, in workflow order.
+                Empty when the user may not change the status (e.g. closed tickets,
+                or a customer's ticket that is not resolved).
     TicketPage:
       type: object
       required: [items, page, limit, total, totalPages]

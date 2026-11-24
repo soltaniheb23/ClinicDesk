@@ -45,3 +45,8 @@ export function getTickets({ page = 1, limit = 10, signal } = {}) {
 export function getTicket(id, { signal } = {}) {
   return api.get(`/api/v1/tickets/${encodeURIComponent(id)}`, { signal });
 }
+
+// Returns { ticket } with the new status and allowedNextStatuses.
+export function updateTicketStatus(id, status) {
+  return api.patch(`/api/v1/tickets/${encodeURIComponent(id)}/status`, { status });
+}

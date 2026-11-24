@@ -6,11 +6,12 @@ import ErrorMessage from '../components/ErrorMessage.jsx';
 import Loading from '../components/Loading.jsx';
 import { PriorityBadge, StatusBadge } from '../tickets/Badges.jsx';
 import { formatDate } from '../tickets/format.js';
-import { CATEGORY_OPTIONS, labelFor } from '../tickets/options.js';
+import { CATEGORY_OPTIONS, STATUS_LABELS, labelFor } from '../tickets/options.js';
+import StatusControl from '../tickets/StatusControl.jsx';
 import '../tickets/tickets.css';
 
-// Ticket detail (wireframe 03), read-only. Comments (CD-12), status changes (CD-13) and
-// assignment (CD-14) come later.
+// Ticket detail (wireframe 03) with the status control. Comments, assignment and
+// attachments come in later tickets.
 function TicketDetailPage() {
   const { id } = useParams();
   const location = useLocation();
@@ -18,6 +19,7 @@ function TicketDetailPage() {
   const [reloadCount, setReloadCount] = useState(0);
   const requestKey = `${id}:${reloadCount}`;
   const [result, setResult] = useState({ key: null });
+  const [statusMessage, setStatusMessage] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -70,6 +72,11 @@ function TicketDetailPage() {
 
   const { ticket } = result;
 
+  function handleStatusUpdated(updated) {
+    setResult((previous) => ({ ...previous, ticket: updated }));
+    setStatusMessage(`Status changed to ${STATUS_LABELS[updated.status] ?? updated.status}.`);
+  }
+
   return (
     <article>
       {backLink}
@@ -80,6 +87,12 @@ function TicketDetailPage() {
           <PriorityBadge priority={ticket.priority} />
         </div>
       </header>
+      <StatusControl key={ticket.status} ticket={ticket} onUpdated={handleStatusUpdated} />
+      {statusMessage && (
+        <p className="form-success" role="status">
+          {statusMessage}
+        </p>
+      )}
       <dl className="ticket-meta">
         <div>
           <dt>Category</dt>
