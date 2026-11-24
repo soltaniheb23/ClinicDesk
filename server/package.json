@@ -7,6 +7,7 @@
     "dev": "nodemon src/server.js",
     "lint": "eslint .",
     "test": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage",
     "format": "prettier --write ."
   },
   "dependencies": {
@@ -26,5 +27,26 @@
     "nodemon": "^3.1.14",
     "prettier": "^3.10.1",
     "supertest": "^7.3.2"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/server.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text-summary",
+      "text",
+      "lcov"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 80,
+        "branches": 80,
+        "functions": 80,
+        "lines": 80
+      }
+    }
   }
 }

@@ -15,6 +15,10 @@ ClinicDesk has three roles. New accounts from `/auth/register` are always
   only for their own resources. Ticket routes (CD-11) will answer `404` rather than `403`
   for tickets a customer may not see, so ticket IDs are not revealed.
 
+Every protected route is tested against every role (and against missing, expired and
+deactivated-user tokens and other customers' tickets) in
+`server/tests/routeAccess.test.js`.
+
 ## What each role may do
 
 The ticket, comment, attachment, user and admin endpoints are planned; this table is the

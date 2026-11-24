@@ -173,6 +173,19 @@ describe('GET /api/v1/tickets/:id/comments', () => {
     expect(JSON.stringify(response.body)).not.toContain('passwordHash');
   });
 
+  it('returns author null when the author account was deleted', async () => {
+    const { customer, agent, ticket } = await threadSetup();
+    await User.deleteOne({ _id: agent.user._id });
+
+    const response = await listComments(customer.token, ticket.id);
+
+    expect(response.status).toBe(200);
+    expect(response.body.items[1]).toMatchObject({
+      body: 'We are replacing the toner today.',
+      author: null,
+    });
+  });
+
   it('returns an empty list for a ticket without comments', async () => {
     const customer = await createUser();
     const ticket = await createTicket(customer.user);
