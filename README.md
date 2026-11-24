@@ -46,7 +46,8 @@ The client runs at <http://localhost:5173>; the API health check is at
 The client page at <http://localhost:5173/health-check> requests `/api/v1/hello`
 through the Vite development proxy. Start the server before opening it to see its
 API greeting. The other routes are `/login`, `/register` and `/tickets` (requires
-login); `/` redirects to `/tickets`.
+login); `/` redirects to `/tickets`. Registering or logging in needs the server's
+`MONGODB_URI` and `JWT_SECRET` (see `server/.env.example`).
 
 Run checks from each app folder:
 
@@ -111,6 +112,9 @@ the client. The API deployment is described by [`render.yaml`](render.yaml).
 4. Open `/health-check` on the Vercel deployment. The page should show `Hello from ClinicDesk API`,
 	confirming the frontend can reach the deployed backend. `client/vercel.json`
 	rewrites every path to `index.html` so client-side routes work on reload.
+5. Open `/register` on the Vercel deployment, create an account, and check that
+	you land on `/tickets` with your name and role in the header. Log out, then log
+	back in at `/login`.
 
 The Atlas connection string is staged for future database integration; the
 current application does not yet connect to MongoDB. Configure secrets only in

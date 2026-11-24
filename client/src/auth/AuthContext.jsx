@@ -1,55 +1,23 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { setUnauthorizedHandler } from '../api/index.js';
+import { EMPTY_SESSION, loadSession, saveSession } from './session.js';
 
-// Token storage trade-off:
-// The token lives in React state (memory) and is mirrored to sessionStorage so a page
-// refresh does not log the user out. Any script running on the page (for example after an
-// XSS bug) can read sessionStorage just like localStorage, so neither is safe against XSS.
-// sessionStorage is still the smaller risk: it is scoped to one browser tab and cleared when
-// the tab closes, while localStorage keeps the token on disk until it expires. That matters on
-// shared clinic computers. A future option is an httpOnly cookie set by the API, which page
-// scripts cannot read at all.
-const STORAGE_KEY = 'clinicdesk.auth';
-
+// See session.js for where the token is kept and why.
 const AuthContext = createContext(null);
 
-function readStoredAuth() {
-  try {
-    const stored = JSON.parse(window.sessionStorage.getItem(STORAGE_KEY));
-    if (stored && typeof stored.token === 'string') {
-      return { token: stored.token, user: stored.user ?? null };
-    }
-  } catch {
-    // Missing, corrupt or blocked storage: start logged out.
-  }
-  return { token: null, user: null };
-}
-
-function writeStoredAuth(value) {
-  try {
-    if (value.token) {
-      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(value));
-    } else {
-      window.sessionStorage.removeItem(STORAGE_KEY);
-    }
-  } catch {
-    // Storage can be unavailable (private mode, quota); the in-memory state still works.
-  }
-}
-
 export function AuthProvider({ children }) {
-  const [auth, setAuth] = useState(readStoredAuth);
+  const [auth, setAuth] = useState(loadSession);
 
   const login = useCallback((token, user = null) => {
-    const next = { token, user };
-    writeStoredAuth(next);
-    setAuth(next);
+    setAuth(saveSession({ token, user }));
   }, []);
 
   const logout = useCallback(() => {
-    const next = { token: null, user: null };
-    writeStoredAuth(next);
-    setAuth(next);
+    setAuth(saveSession(EMPTY_SESSION));
   }, []);
+
+  // A 401 on a call that carried the token means the session is no longer valid.
+  useEffect(() => setUnauthorizedHandler(logout), [logout]);
 
   const value = useMemo(
     () => ({ token: auth.token, user: auth.user, login, logout }),

@@ -55,7 +55,7 @@ describe('ProtectedRoute', () => {
   it('redirects to /login when logged out', () => {
     renderAt('/tickets');
 
-    expect(screen.getByRole('heading', { name: 'Log in' })).toBeTruthy();
+    expect(screen.getByRole('form', { name: 'Log in' })).toBeTruthy();
     expect(screen.queryByText('Ticket list')).toBeNull();
   });
 
@@ -72,7 +72,7 @@ describe('ProtectedRoute', () => {
 
   it('returns the user to the remembered page after login', () => {
     renderAt('/settings');
-    expect(screen.getByRole('heading', { name: 'Log in' })).toBeTruthy();
+    expect(screen.getByRole('form', { name: 'Log in' })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Fake login' }));
 

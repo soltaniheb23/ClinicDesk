@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './auth/ProtectedRoute.jsx';
+import AppLayout from './components/AppLayout.jsx';
 import HealthCheckPage from './pages/HealthCheckPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
@@ -14,13 +15,14 @@ function AppRoutes() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/health-check" element={<HealthCheckPage />} />
       <Route
-        path="/tickets"
         element={
           <ProtectedRoute>
-            <TicketsPage />
+            <AppLayout />
           </ProtectedRoute>
         }
-      />
+      >
+        <Route path="/tickets" element={<TicketsPage />} />
+      </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

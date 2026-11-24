@@ -1,8 +1,6 @@
-import { act, cleanup, renderHook } from '@testing-library/react';
+import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthProvider, useAuth } from '../auth/AuthContext.jsx';
 import { ApiError, createApiClient, NETWORK_ERROR_MESSAGE } from './client.js';
-import { useApi } from './useApi.js';
 
 function jsonResponse(status, body) {
   return {
@@ -107,30 +105,5 @@ describe('createApiClient', () => {
       code: 'NETWORK_ERROR',
       message: NETWORK_ERROR_MESSAGE,
     });
-  });
-});
-
-describe('useApi', () => {
-  it('logs the user out when a protected call returns 401', async () => {
-    window.sessionStorage.setItem(
-      'clinicdesk.auth',
-      JSON.stringify({ token: 'expired', user: { name: 'Mara' } }),
-    );
-    fetchMock.mockResolvedValue(
-      jsonResponse(401, { error: { code: 'UNAUTHORIZED', message: 'Session expired' } }),
-    );
-
-    const { result } = renderHook(() => ({ api: useApi(), auth: useAuth() }), {
-      wrapper: AuthProvider,
-    });
-    expect(result.current.auth.token).toBe('expired');
-
-    await act(async () => {
-      await result.current.api.get('/api/v1/tickets').catch(() => {});
-    });
-
-    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer expired');
-    expect(result.current.auth.token).toBeNull();
-    expect(window.sessionStorage.getItem('clinicdesk.auth')).toBeNull();
   });
 });

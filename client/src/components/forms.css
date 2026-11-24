@@ -1,0 +1,116 @@
+/* Login/register card and form fields. Colors, fonts and spacing come from tokens.css. */
+.auth-page {
+  background: var(--color-cream);
+  padding: var(--space-5);
+}
+
+.auth-card {
+  width: min(100%, 486px);
+  padding: var(--space-6);
+  border: 1px solid var(--color-sage);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+  color: var(--color-olive);
+  font-family: var(--font-body);
+}
+
+.auth-title {
+  max-width: none;
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-heading);
+  font-size: 2.25rem;
+  letter-spacing: normal;
+  line-height: 1.2;
+}
+
+.auth-subtitle {
+  margin: var(--space-3) 0 var(--space-5);
+  font-size: 0.9rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field-label {
+  font-weight: var(--font-weight-bold);
+  font-size: 0.95rem;
+}
+
+.field-hint {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.field-input {
+  min-height: var(--size-touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-green);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+  color: var(--color-olive);
+  font: inherit;
+}
+
+.field-input[aria-invalid='true'] {
+  border: 2px solid var(--color-error-text);
+}
+
+.field-input:focus-visible,
+.button-primary:focus-visible,
+.auth-link:focus-visible {
+  outline: 3px solid var(--color-olive);
+  outline-offset: 2px;
+}
+
+.field-error {
+  margin: 0;
+  color: var(--color-error-text);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+}
+
+.form-error {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-error-text);
+  border-radius: var(--radius-sm);
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
+}
+
+.button-primary {
+  width: 100%;
+  min-height: var(--size-touch-target);
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-green);
+  color: var(--color-white);
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+.button-primary:disabled {
+  cursor: progress;
+  opacity: 0.75;
+}
+
+.auth-footer {
+  margin: var(--space-5) 0 0;
+}
+
+.auth-link {
+  color: var(--color-olive);
+  font-weight: var(--font-weight-bold);
+}

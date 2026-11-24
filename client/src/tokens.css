@@ -24,6 +24,24 @@
   --color-priority-urgent-bg: #f2d3cc;
   --color-priority-urgent-text: #8a2b1b;
 
+  /* Feedback (aliases of the urgent tint, 6.13:1) */
+  --color-error-bg: var(--color-priority-urgent-bg);
+  --color-error-text: var(--color-priority-urgent-text);
+
+  /* Spacing (4px scale) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Shape and touch targets */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --size-touch-target: 44px; /* WCAG 2.5.5 minimum target height */
+
   /* Typography */
   --font-heading: 'Fraunces', Georgia, 'Times New Roman', serif;
   --font-body: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;

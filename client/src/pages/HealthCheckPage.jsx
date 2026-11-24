@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useApi } from '../api/useApi.js';
+import { api } from '../api/index.js';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import Loading from '../components/Loading.jsx';
 
 // Staging proof from CD-6: shows that the frontend can reach the deployed API.
 function HealthCheckPage() {
-  const api = useApi();
   const [greeting, setGreeting] = useState(null);
   const [error, setError] = useState(null);
 
@@ -20,7 +19,7 @@ function HealthCheckPage() {
       });
 
     return () => controller.abort();
-  }, [api]);
+  }, []);
 
   return (
     <main>
