@@ -28,3 +28,13 @@ export function registerUser({ name, email, password }) {
 export function loginUser({ email, password }) {
   return api.post('/api/v1/auth/login', { email, password });
 }
+
+// Returns { ticket }. The server sets createdBy, status and assignee.
+export function createTicket({ title, description, category, priority }) {
+  return api.post('/api/v1/tickets', { title, description, category, priority });
+}
+
+// Returns { items }: the logged-in user's tickets, newest first (at most 50).
+export function getMyTickets({ signal } = {}) {
+  return api.get('/api/v1/tickets/mine', { signal });
+}

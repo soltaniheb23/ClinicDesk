@@ -205,7 +205,11 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [Tickets]
-      summary: Create a ticket
+      summary: Create a ticket (customer, agent, admin)
+      description: >
+        `createdBy` is the logged-in user. Unknown keys such as `status`, `createdBy`
+        and `assignee` are ignored; new tickets are always `open` and unassigned.
+        `category` defaults to `other` and `priority` to `normal`.
       requestBody:
         required: true
         content:
@@ -221,17 +225,78 @@ paths:
           description: Created
           content:
             application/json:
+              schema:
+                type: object
+                required: [ticket]
+                properties:
+                  ticket: { $ref: '#/components/schemas/Ticket' }
               example:
                 ticket:
-                  id: '6651b2'
+                  id: 6651b2a7c3d4e5f6a7b8c9d1
                   title: Printer in reception not working
-                  status: open
-                  priority: high
+                  description: It shows error E-12 since this morning.
                   category: it
-                  createdBy: '6650a1'
+                  priority: high
+                  status: open
+                  createdBy: 6650a1f2c3d4e5f6a7b8c9d0
                   assignee: null
+                  firstResponseAt: null
+                  resolvedAt: null
                   createdAt: '2026-12-01T09:15:00.000Z'
-        '400': { $ref: '#/components/responses/ValidationError' }
+                  updatedAt: '2026-12-01T09:15:00.000Z'
+        '400':
+          description: Validation error (VALIDATION_ERROR)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: Some fields are invalid
+                  details:
+                    - { field: title, message: Title must be at most 120 characters }
+                    - { field: category, message: Choose a valid category }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413':
+          description: Request body larger than 32 KB (PAYLOAD_TOO_LARGE)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /tickets/mine:
+    get:
+      tags: [Tickets]
+      summary: My tickets (any role)
+      description: >
+        Tickets created by the logged-in user, newest first, at most 50. A minimal read
+        for CD-10; the filtered, paginated list is `GET /tickets` (CD-11).
+      responses:
+        '200':
+          description: My tickets
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 50
+                    items: { $ref: '#/components/schemas/Ticket' }
+              example:
+                items:
+                  - id: 6651b2a7c3d4e5f6a7b8c9d1
+                    title: Printer in reception not working
+                    description: It shows error E-12 since this morning.
+                    category: it
+                    priority: high
+                    status: open
+                    createdBy: 6650a1f2c3d4e5f6a7b8c9d0
+                    assignee: null
+                    firstResponseAt: null
+                    resolvedAt: null
+                    createdAt: '2026-12-01T09:15:00.000Z'
+                    updatedAt: '2026-12-01T09:15:00.000Z'
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /tickets/{id}:
@@ -555,10 +620,14 @@ components:
       type: object
       required: [title, description]
       properties:
-        title: { type: string, maxLength: 120 }
-        description: { type: string, maxLength: 5000 }
-        category: { $ref: '#/components/schemas/Category' }
-        priority: { $ref: '#/components/schemas/Priority' }
+        title: { type: string, minLength: 1, maxLength: 120, description: Trimmed }
+        description: { type: string, minLength: 1, maxLength: 5000, description: Trimmed }
+        category:
+          allOf: [ { $ref: '#/components/schemas/Category' } ]
+          default: other
+        priority:
+          allOf: [ { $ref: '#/components/schemas/Priority' } ]
+          default: normal
     Ticket:
       type: object
       properties:

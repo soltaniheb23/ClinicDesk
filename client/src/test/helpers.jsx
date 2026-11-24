@@ -23,8 +23,10 @@ export function storedSession() {
   return JSON.parse(window.sessionStorage.getItem(STORAGE_KEY));
 }
 
+// Answers fetch calls with `responses` in order, then with an empty ticket list (the page
+// most tests land on after logging in).
 export function stubFetch(...responses) {
-  const fetchMock = vi.fn();
+  const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { items: [] }));
   for (const response of responses) {
     if (response instanceof Error) fetchMock.mockRejectedValueOnce(response);
     else fetchMock.mockResolvedValueOnce(response);
@@ -35,7 +37,7 @@ export function stubFetch(...responses) {
 
 function LocationProbe() {
   const location = useLocation();
-  return <output data-testid="location">{location.pathname}</output>;
+  return <div data-testid="location">{location.pathname}</div>;
 }
 
 // Renders the real routes at `entry` (a path or { pathname, state }).

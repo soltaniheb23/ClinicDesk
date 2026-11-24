@@ -1,13 +1,15 @@
 import { cleanup, fireEvent, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { renderApp, storeSession } from '../test/helpers.jsx';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderApp, storeSession, stubFetch } from '../test/helpers.jsx';
 
 beforeEach(() => {
   window.sessionStorage.clear();
+  stubFetch(); // The tickets page loads the user's tickets.
 });
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe('AppLayout', () => {

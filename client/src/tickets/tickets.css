@@ -1,0 +1,161 @@
+/* Ticket pages. Colors, fonts and spacing come from tokens.css. */
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+}
+
+.page-header .page-title {
+  margin: 0;
+}
+
+.ticket-form {
+  max-width: 640px;
+}
+
+.ticket-form textarea.field-input {
+  min-height: 128px;
+  resize: vertical;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--size-touch-target);
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+}
+
+.button-link-primary {
+  background: var(--color-green);
+  color: var(--color-white);
+}
+
+.button-secondary {
+  min-height: var(--size-touch-target);
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid var(--color-green);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-olive);
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.form-actions .button-primary {
+  width: auto;
+  padding: var(--space-2) var(--space-5);
+}
+
+.button-link:focus-visible,
+.button-secondary:focus-visible {
+  outline: 3px solid var(--color-olive);
+  outline-offset: 2px;
+}
+
+.form-success {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-green);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+  color: var(--color-olive);
+}
+
+.ticket-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--color-sage);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+}
+
+.ticket-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ticket-table th,
+.ticket-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-sage);
+  text-align: left;
+  vertical-align: top;
+}
+
+.ticket-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.ticket-table th {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.badge {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+/* Statuses and priorities without their own tint use the neutral open/normal tint. */
+.badge-status-open,
+.badge-status-resolved,
+.badge-status-closed,
+.badge-priority-low,
+.badge-priority-normal {
+  background: var(--color-status-open-bg);
+  color: var(--color-status-open-text);
+}
+
+.badge-status-in_progress {
+  background: var(--color-status-in-progress-bg);
+  color: var(--color-status-in-progress-text);
+}
+
+.badge-status-waiting {
+  background: var(--color-status-waiting-bg);
+  color: var(--color-status-waiting-text);
+}
+
+.badge-priority-high {
+  background: var(--color-priority-high-bg);
+  color: var(--color-priority-high-text);
+}
+
+.badge-priority-urgent {
+  background: var(--color-priority-urgent-bg);
+  color: var(--color-priority-urgent-text);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
