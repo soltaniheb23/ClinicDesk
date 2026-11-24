@@ -52,14 +52,36 @@ function createTicket(token, body = validTicket) {
   return request(app).post('/api/v1/tickets').set('Authorization', `Bearer ${token}`).send(body);
 }
 
-function myTickets(token) {
-  return request(app).get('/api/v1/tickets/mine').set('Authorization', `Bearer ${token}`);
+function listTickets(token, query = '') {
+  return request(app).get(`/api/v1/tickets${query}`).set('Authorization', `Bearer ${token}`);
 }
+
+function getTicket(token, id) {
+  return request(app).get(`/api/v1/tickets/${id}`).set('Authorization', `Bearer ${token}`);
+}
+
+// Inserts tickets with distinct, increasing createdAt values (index 0 is the oldest).
+async function seedTickets(owner, count, startAt = Date.UTC(2026, 11, 1)) {
+  return Ticket.insertMany(
+    Array.from({ length: count }, (_, index) => ({
+      ...validTicket,
+      title: `Ticket ${index + 1}`,
+      createdBy: owner._id,
+      createdAt: new Date(startAt + index * 60000),
+    })),
+  );
+}
+
+const NOT_FOUND_BODY = { error: { code: 'NOT_FOUND', message: 'Ticket not found' } };
 
 describe('authentication', () => {
   it.each([
     ['POST /api/v1/tickets', () => request(app).post('/api/v1/tickets').send(validTicket)],
-    ['GET /api/v1/tickets/mine', () => request(app).get('/api/v1/tickets/mine')],
+    ['GET /api/v1/tickets', () => request(app).get('/api/v1/tickets')],
+    [
+      'GET /api/v1/tickets/:id',
+      () => request(app).get(`/api/v1/tickets/${new mongoose.Types.ObjectId()}`),
+    ],
   ])('%s returns 401 without a token', async (_label, send) => {
     const response = await send();
 
@@ -79,7 +101,7 @@ describe('POST /api/v1/tickets', () => {
     expect(response.body.ticket).toMatchObject({
       ...validTicket,
       status: 'open',
-      createdBy: user.id,
+      createdBy: { id: user.id, name: user.name },
       assignee: null,
     });
     expect(response.body.ticket.id).toEqual(expect.any(String));
@@ -111,7 +133,7 @@ describe('POST /api/v1/tickets', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.ticket).toMatchObject({
-      createdBy: user.id,
+      createdBy: { id: user.id, name: user.name },
       status: 'open',
       assignee: null,
       resolvedAt: null,
@@ -205,53 +227,215 @@ describe('POST /api/v1/tickets', () => {
   });
 });
 
-describe('GET /api/v1/tickets/mine', () => {
-  it('returns only my tickets, newest first', async () => {
-    const me = await createUser();
-    const other = await createUser();
-
-    await createTicket(me.token, { ...validTicket, title: 'First' });
-    await createTicket(other.token, { ...validTicket, title: 'Not mine' });
-    await createTicket(me.token, { ...validTicket, title: 'Second' });
-    await createTicket(me.token, { ...validTicket, title: 'Third' });
-
-    const response = await myTickets(me.token);
-
-    expect(response.status).toBe(200);
-    expect(response.body.items.map((ticket) => ticket.title)).toEqual(['Third', 'Second', 'First']);
-    expect(response.body.items.every((ticket) => ticket.createdBy === me.user.id)).toBe(true);
-  });
-
-  it('returns an empty list when I have no tickets', async () => {
-    const { token } = await createUser();
-
-    const response = await myTickets(token);
-
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({ items: [] });
-  });
-
-  it('returns at most 50 tickets', async () => {
+describe('GET /api/v1/tickets', () => {
+  it('paginates newest first with page, limit, total and totalPages', async () => {
     const { user, token } = await createUser();
-    await Ticket.insertMany(
-      Array.from({ length: 55 }, (_, index) => ({
+    await seedTickets(user, 7);
+
+    const first = await listTickets(token, '?limit=3');
+    const second = await listTickets(token, '?page=2&limit=3');
+    const last = await listTickets(token, '?page=3&limit=3');
+
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({ page: 1, limit: 3, total: 7, totalPages: 3 });
+    expect(first.body.items.map((ticket) => ticket.title)).toEqual([
+      'Ticket 7',
+      'Ticket 6',
+      'Ticket 5',
+    ]);
+    expect(second.body).toMatchObject({ page: 2, limit: 3, total: 7, totalPages: 3 });
+    expect(second.body.items.map((ticket) => ticket.title)).toEqual([
+      'Ticket 4',
+      'Ticket 3',
+      'Ticket 2',
+    ]);
+    expect(last.body.items.map((ticket) => ticket.title)).toEqual(['Ticket 1']);
+  });
+
+  it('defaults to page 1 and 10 per page', async () => {
+    const { user, token } = await createUser();
+    await seedTickets(user, 12);
+
+    const response = await listTickets(token);
+
+    expect(response.body).toMatchObject({ page: 1, limit: 10, total: 12, totalPages: 2 });
+    expect(response.body.items).toHaveLength(10);
+  });
+
+  it('breaks createdAt ties by _id, newest first', async () => {
+    const { user, token } = await createUser();
+    const sameTime = new Date(Date.UTC(2026, 11, 1));
+    const inserted = await Ticket.insertMany(
+      ['A', 'B', 'C'].map((title) => ({
         ...validTicket,
-        title: `Ticket ${index}`,
+        title,
         createdBy: user._id,
+        createdAt: sameTime,
       })),
     );
+    const expected = [...inserted]
+      .sort((a, b) => (a._id.toString() < b._id.toString() ? 1 : -1))
+      .map((ticket) => ticket.title);
 
-    const response = await myTickets(token);
+    const response = await listTickets(token);
 
-    expect(response.body.items).toHaveLength(50);
+    expect(response.body.items.map((ticket) => ticket.title)).toEqual(expected);
+  });
+
+  it('returns an empty page past the end', async () => {
+    const { user, token } = await createUser();
+    await seedTickets(user, 2);
+
+    const response = await listTickets(token, '?page=5');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ items: [], page: 5, total: 2, totalPages: 1 });
+  });
+
+  it('returns totalPages 0 when there are no tickets', async () => {
+    const { token } = await createUser();
+
+    const response = await listTickets(token);
+
+    expect(response.body).toEqual({ items: [], page: 1, limit: 10, total: 0, totalPages: 0 });
+  });
+
+  it('shows a customer only their own tickets', async () => {
+    const me = await createUser();
+    const other = await createUser();
+    await seedTickets(me.user, 2);
+    await seedTickets(other.user, 3);
+
+    const response = await listTickets(me.token);
+
+    expect(response.body.total).toBe(2);
+    expect(response.body.items.every((ticket) => ticket.createdBy.id === me.user.id)).toBe(true);
+  });
+
+  it.each(['agent', 'admin'])("shows an %s everyone's tickets", async (role) => {
+    const staff = await createUser(role);
+    const alice = await createUser();
+    const bob = await createUser();
+    await seedTickets(alice.user, 2);
+    await seedTickets(bob.user, 3);
+
+    const response = await listTickets(staff.token);
+
+    expect(response.body.total).toBe(5);
+    const owners = new Set(response.body.items.map((ticket) => ticket.createdBy.id));
+    expect(owners).toEqual(new Set([alice.user.id, bob.user.id]));
+  });
+
+  it.each([
+    ['page=0', 'page'],
+    ['page=-1', 'page'],
+    ['page=abc', 'page'],
+    ['page=1.5', 'page'],
+    ['page=', 'page'],
+    ['page=1&page=2', 'page'],
+    ['limit=0', 'limit'],
+    ['limit=51', 'limit'],
+    ['limit=ten', 'limit'],
+  ])('returns 400 for ?%s', async (query, field) => {
+    const { token } = await createUser();
+
+    const response = await listTickets(token, `?${query}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(response.body.error.details.map((detail) => detail.field)).toContain(field);
+  });
+
+  it('populates users as { id, name } only', async () => {
+    const owner = await createUser();
+    const agent = await createUser('agent');
+    await Ticket.create({ ...validTicket, createdBy: owner.user._id, assignee: agent.user._id });
+
+    const response = await listTickets(agent.token);
+    const [ticket] = response.body.items;
+
+    expect(ticket.createdBy).toEqual({ id: owner.user.id, name: owner.user.name });
+    expect(ticket.assignee).toEqual({ id: agent.user.id, name: agent.user.name });
+    expect(JSON.stringify(response.body)).not.toMatch(/email|passwordHash|not-a-real-hash/);
   });
 
   it('shows a new ticket immediately after creating it', async () => {
     const { token } = await createUser();
     const created = await createTicket(token);
 
-    const response = await myTickets(token);
+    const response = await listTickets(token);
 
     expect(response.body.items[0].id).toBe(created.body.ticket.id);
+  });
+});
+
+describe('GET /api/v1/tickets/:id', () => {
+  it('returns the ticket to its owner with users as { id, name }', async () => {
+    const { user, token } = await createUser();
+    const created = await createTicket(token);
+
+    const response = await getTicket(token, created.body.ticket.id);
+
+    expect(response.status).toBe(200);
+    expect(response.body.ticket).toMatchObject({
+      id: created.body.ticket.id,
+      ...validTicket,
+      status: 'open',
+      createdBy: { id: user.id, name: user.name },
+      assignee: null,
+    });
+    expect(JSON.stringify(response.body)).not.toMatch(/email|passwordHash|not-a-real-hash/);
+  });
+
+  it("returns the same 404 for another customer's ticket, an unknown id and an invalid id", async () => {
+    const alice = await createUser();
+    const bob = await createUser();
+    const created = await createTicket(alice.token);
+
+    const responses = await Promise.all([
+      getTicket(bob.token, created.body.ticket.id),
+      getTicket(bob.token, new mongoose.Types.ObjectId().toString()),
+      getTicket(bob.token, 'not-an-id'),
+    ]);
+
+    for (const response of responses) {
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual(NOT_FOUND_BODY);
+    }
+  });
+
+  it.each(['agent', 'admin'])('lets an %s open any ticket', async (role) => {
+    const customer = await createUser();
+    const staff = await createUser(role);
+    const created = await createTicket(customer.token);
+
+    const response = await getTicket(staff.token, created.body.ticket.id);
+
+    expect(response.status).toBe(200);
+    expect(response.body.ticket.createdBy).toEqual({
+      id: customer.user.id,
+      name: customer.user.name,
+    });
+  });
+
+  it('populates the assignee as { id, name } only', async () => {
+    const customer = await createUser();
+    const agent = await createUser('agent');
+    const ticket = await Ticket.create({
+      ...validTicket,
+      createdBy: customer.user._id,
+      assignee: agent.user._id,
+    });
+
+    const response = await getTicket(customer.token, ticket.id);
+
+    expect(response.body.ticket.assignee).toEqual({ id: agent.user.id, name: agent.user.name });
+    expect(Object.keys(response.body.ticket.createdBy).sort()).toEqual(['id', 'name']);
+  });
+
+  it('returns 401 without a token', async () => {
+    const response = await request(app).get(`/api/v1/tickets/${new mongoose.Types.ObjectId()}`);
+
+    expect(response.status).toBe(401);
   });
 });

@@ -34,7 +34,14 @@ export function createTicket({ title, description, category, priority }) {
   return api.post('/api/v1/tickets', { title, description, category, priority });
 }
 
-// Returns { items }: the logged-in user's tickets, newest first (at most 50).
-export function getMyTickets({ signal } = {}) {
-  return api.get('/api/v1/tickets/mine', { signal });
+// Returns { items, page, limit, total, totalPages }, newest first. Customers get their own
+// tickets; agents and admins get all.
+export function getTickets({ page = 1, limit = 10, signal } = {}) {
+  const query = new URLSearchParams({ page: String(page), limit: String(limit) });
+  return api.get(`/api/v1/tickets?${query}`, { signal });
+}
+
+// Returns { ticket }; a 404 ApiError for unknown, invalid or foreign ids.
+export function getTicket(id, { signal } = {}) {
+  return api.get(`/api/v1/tickets/${encodeURIComponent(id)}`, { signal });
 }

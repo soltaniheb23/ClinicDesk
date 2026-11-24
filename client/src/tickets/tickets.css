@@ -108,17 +108,128 @@
 }
 
 .ticket-table th {
+  background: var(--color-cream);
   font-size: 0.875rem;
   font-weight: var(--font-weight-bold);
 }
 
-.badge {
+.ticket-title-link {
+  color: var(--color-olive);
+  font-weight: var(--font-weight-medium);
+}
+
+.ticket-title-link:focus-visible,
+.back-link:focus-visible {
+  outline: 3px solid var(--color-olive);
+  outline-offset: 2px;
+}
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: var(--space-5);
+}
+
+.pagination .button-secondary {
+  cursor: pointer;
+}
+
+.pagination .button-secondary:disabled {
+  border-color: var(--color-sage);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Ticket detail (wireframe 03). */
+.back-link {
   display: inline-block;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-4);
+  color: var(--color-olive);
+  font-weight: var(--font-weight-bold);
+}
+
+.ticket-detail-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.ticket-detail-header .page-title {
+  margin: 0;
+}
+
+.ticket-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: var(--space-3) 0 var(--space-5);
+  font-size: 0.9rem;
+}
+
+.ticket-meta div {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.ticket-meta dt::after {
+  content: ':';
+}
+
+.ticket-meta dd {
+  margin: 0;
+}
+
+.ticket-description {
+  max-width: 830px;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-sage);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+}
+
+.ticket-description h2 {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-heading);
+  font-size: 1.1rem;
+}
+
+.ticket-description p {
+  margin: 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.badge {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
   font-size: 0.8rem;
   font-weight: var(--font-weight-bold);
   white-space: nowrap;
+}
+
+/* Decorative dot in the badge's text color (wireframe 02). */
+.badge::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
 }
 
 /* Statuses and priorities without their own tint use the neutral open/normal tint. */
