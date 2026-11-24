@@ -36,6 +36,23 @@ Each badge uses a light tint background with dark text of the same hue.
 Open and normal share the neutral blue-grey; waiting and high share amber.
 Badges always carry a text label, so color is never the only signal.
 
+## Feedback colors
+
+| Token | Value | Use |
+|---|---|---|
+| `--color-error-bg` | `#F2D3CC` (urgent tint) | Form error area background |
+| `--color-error-text` | `#8A2B1B` (urgent text) | Error text and invalid-field borders |
+
+Errors reuse the urgent tint (6.13:1) so the palette stays small.
+
+## Spacing and shape
+
+Spacing follows a 4px scale: `--space-1` (4px), `--space-2` (8px), `--space-3`
+(12px), `--space-4` (16px), `--space-5` (24px), `--space-6` (32px), `--space-7`
+(48px). Corners use `--radius-sm` (8px, inputs and buttons) and `--radius-md`
+(12px, cards). `--size-touch-target` (44px) is the minimum height of buttons and
+inputs (WCAG 2.5.5).
+
 ## Typography
 
 | Role | Family | Weights | Token |

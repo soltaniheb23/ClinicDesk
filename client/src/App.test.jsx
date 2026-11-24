@@ -42,7 +42,7 @@ describe('App routing', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'Log in' })).toBeTruthy();
+    expect(await screen.findByRole('form', { name: 'Log in' })).toBeTruthy();
     expect(window.location.pathname).toBe('/login');
   });
 
