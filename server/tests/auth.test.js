@@ -168,3 +168,43 @@ describe('POST /api/v1/auth/login', () => {
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
   });
 });
+
+describe('GET /api/v1/auth/me', () => {
+  it('returns the current user without the password hash', async () => {
+    const { body } = await register();
+
+    const response = await request(app)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${body.token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.user).toMatchObject({
+      id: body.user.id,
+      name: validUser.name,
+      email: validUser.email,
+      role: 'customer',
+      isActive: true,
+    });
+    expect(response.body.user).not.toHaveProperty('passwordHash');
+  });
+
+  it('returns 401 without a token', async () => {
+    const response = await request(app).get('/api/v1/auth/me');
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({
+      error: { code: 'UNAUTHENTICATED', message: 'Authentication required' },
+    });
+  });
+
+  it('returns 401 once the user is deactivated', async () => {
+    const { body } = await register();
+    await User.updateOne({ email: validUser.email }, { isActive: false });
+
+    const response = await request(app)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${body.token}`);
+
+    expect(response.status).toBe(401);
+  });
+});

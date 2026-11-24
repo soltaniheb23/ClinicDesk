@@ -3,6 +3,7 @@ const { z } = require('zod');
 const User = require('../models/User');
 const { hashPassword, verifyPassword } = require('../auth/password');
 const { signToken } = require('../auth/token');
+const { authenticate, unauthenticated } = require('../auth/authenticate');
 
 const router = express.Router();
 
@@ -98,6 +99,15 @@ router.post('/login', async (request, response) => {
   }
 
   return response.json({ token: signToken(user), user });
+});
+
+router.get('/me', authenticate, async (request, response) => {
+  const user = await User.findById(request.user.id);
+
+  // The user could be deleted between authenticate() and this lookup.
+  if (!user) return unauthenticated(response);
+
+  return response.json({ user });
 });
 
 module.exports = router;
