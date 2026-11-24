@@ -1,0 +1,74 @@
+/* Loading, empty and error states. Colors come from tokens.css only. */
+.state {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 24px;
+  border: 1px solid var(--color-sage);
+  border-radius: 12px;
+  background: var(--color-paper);
+  color: var(--color-olive);
+  font-family: var(--font-body);
+}
+
+.state-loading {
+  flex-direction: row;
+  align-items: center;
+  font-weight: var(--font-weight-medium);
+}
+
+.state-spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--color-sage);
+  border-top-color: var(--color-green);
+  border-radius: 50%;
+  animation: state-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .state-spinner {
+    animation: none;
+  }
+}
+
+@keyframes state-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.state-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-heading);
+  font-size: 1.25rem;
+}
+
+.state-message {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.state-error {
+  border-color: var(--color-priority-urgent-text);
+  background: var(--color-priority-urgent-bg);
+  color: var(--color-priority-urgent-text);
+}
+
+.button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-green);
+  color: var(--color-white);
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+.button:focus-visible {
+  outline: 3px solid var(--color-olive);
+  outline-offset: 2px;
+}

@@ -18,7 +18,7 @@ ClinicDesk gives them one place to create, track, and resolve tickets.
 - Audit log of important actions
 
 ## Tech stack
-**In use:** React, Vite, Node.js, Express, Jest, Supertest, Vitest, ESLint, Prettier, GitHub Actions
+**In use:** React, React Router, Vite, Node.js, Express, Jest, Supertest, Vitest, ESLint, Prettier, GitHub Actions
 
 **Planned:** MongoDB Atlas data integration, Tailwind CSS, Playwright, Sentry
 
@@ -43,8 +43,10 @@ npm run dev
 
 The client runs at <http://localhost:5173>; the API health check is at
 <http://localhost:3000/health>.
-The client requests `/api/v1/hello` through the Vite development proxy. Start the
-server before opening the client to see its API greeting.
+The client page at <http://localhost:5173/health-check> requests `/api/v1/hello`
+through the Vite development proxy. Start the server before opening it to see its
+API greeting. The other routes are `/login`, `/register` and `/tickets` (requires
+login); `/` redirects to `/tickets`.
 
 Run checks from each app folder:
 
@@ -106,8 +108,9 @@ the client. The API deployment is described by [`render.yaml`](render.yaml).
 	`VITE_API_URL` to the Render API origin (for example,
 	`https://clinicdesk-api.onrender.com`) for the Preview and Production
 	environments, then deploy.
-4. Open the Vercel deployment. The page should show `Hello from ClinicDesk API`,
-	confirming the frontend can reach the deployed backend.
+4. Open `/health-check` on the Vercel deployment. The page should show `Hello from ClinicDesk API`,
+	confirming the frontend can reach the deployed backend. `client/vercel.json`
+	rewrites every path to `index.html` so client-side routes work on reload.
 
 The Atlas connection string is staged for future database integration; the
 current application does not yet connect to MongoDB. Configure secrets only in
