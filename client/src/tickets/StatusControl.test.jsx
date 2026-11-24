@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { jsonResponse, renderApp, storeSession, stubFetch } from '../test/helpers.jsx';
+import { jsonResponse, renderApp, requestsTo, storeSession, stubApi } from '../test/helpers.jsx';
 
 const baseTicket = {
   id: '6651b2a7c3d4e5f6a7b8c9d1',
@@ -12,6 +12,9 @@ const baseTicket = {
   assignee: null,
   createdAt: '2026-12-01T09:15:00.000Z',
 };
+
+const TICKET = `GET /api/v1/tickets/${baseTicket.id}`;
+const PATCH_STATUS = `PATCH /api/v1/tickets/${baseTicket.id}/status`;
 
 function ticketWith(status, allowedNextStatuses) {
   return { ...baseTicket, status, allowedNextStatuses };
@@ -37,10 +40,12 @@ afterEach(() => {
 describe('status control for agents and admins', () => {
   it('lists only the allowed next statuses and sends the PATCH', async () => {
     login('agent');
-    const fetchMock = stubFetch(
-      jsonResponse(200, { ticket: ticketWith('in_progress', ['waiting', 'resolved']) }),
-      jsonResponse(200, { ticket: ticketWith('resolved', ['closed', 'in_progress']) }),
-    );
+    const fetchMock = stubApi({
+      [TICKET]: jsonResponse(200, { ticket: ticketWith('in_progress', ['waiting', 'resolved']) }),
+      [PATCH_STATUS]: jsonResponse(200, {
+        ticket: ticketWith('resolved', ['closed', 'in_progress']),
+      }),
+    });
     renderApp(`/tickets/${baseTicket.id}`);
 
     const select = await screen.findByLabelText('Status');
@@ -58,11 +63,9 @@ describe('status control for agents and admins', () => {
     expect(await screen.findByText('Status changed to Resolved.')).toBeTruthy();
     expect(statusBadge().textContent).toBe('Resolved');
 
-    const [url, init] = fetchMock.mock.calls[1];
-    expect(url).toBe(`/api/v1/tickets/${baseTicket.id}/status`);
-    expect(init.method).toBe('PATCH');
-    expect(init.headers.Authorization).toBe('Bearer jwt-token');
-    expect(JSON.parse(init.body)).toEqual({ status: 'resolved' });
+    const [patch] = requestsTo(fetchMock, PATCH_STATUS);
+    expect(patch.init.headers.Authorization).toBe('Bearer jwt-token');
+    expect(patch.body).toEqual({ status: 'resolved' });
 
     // The control now offers the next steps from the new status.
     const values = within(screen.getByLabelText('Status'))
@@ -74,17 +77,10 @@ describe('status control for agents and admins', () => {
   it('shows a loading state while saving', async () => {
     login('admin');
     let resolve;
-    const ticketResponses = [
-      Promise.resolve(jsonResponse(200, { ticket: ticketWith('open', ['in_progress']) })),
-      new Promise((done) => (resolve = done)),
-    ];
-    // The admin's assignment control also loads the agent list; answer it separately.
-    const fetchMock = vi.fn((url) =>
-      url === '/api/v1/users/agents'
-        ? Promise.resolve(jsonResponse(200, { items: [] }))
-        : ticketResponses.shift(),
-    );
-    vi.stubGlobal('fetch', fetchMock);
+    stubApi({
+      [TICKET]: jsonResponse(200, { ticket: ticketWith('open', ['in_progress']) }),
+      [PATCH_STATUS]: () => new Promise((done) => (resolve = done)),
+    });
     renderApp(`/tickets/${baseTicket.id}`);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Change status' }));
@@ -100,15 +96,15 @@ describe('status control for agents and admins', () => {
 
   it('shows the backend message on a 409 and keeps the old badge', async () => {
     login('agent');
-    stubFetch(
-      jsonResponse(200, { ticket: ticketWith('in_progress', ['waiting', 'resolved']) }),
-      jsonResponse(409, {
+    stubApi({
+      [TICKET]: jsonResponse(200, { ticket: ticketWith('in_progress', ['waiting', 'resolved']) }),
+      [PATCH_STATUS]: jsonResponse(409, {
         error: {
           code: 'STATUS_CONFLICT',
           message: 'The status was changed by someone else. Reload the ticket and try again.',
         },
       }),
-    );
+    });
     renderApp(`/tickets/${baseTicket.id}`);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Change status' }));
@@ -124,7 +120,7 @@ describe('status control for agents and admins', () => {
 
   it('shows no control for a closed ticket', async () => {
     login('admin');
-    stubFetch(jsonResponse(200, { ticket: ticketWith('closed', []) }));
+    stubApi({ [TICKET]: jsonResponse(200, { ticket: ticketWith('closed', []) }) });
     renderApp(`/tickets/${baseTicket.id}`);
 
     await screen.findByRole('heading', { level: 1, name: baseTicket.title });
@@ -136,10 +132,10 @@ describe('status control for agents and admins', () => {
 describe('status control for customers', () => {
   it('shows Close ticket on a resolved ticket and closes it', async () => {
     login('customer');
-    const fetchMock = stubFetch(
-      jsonResponse(200, { ticket: ticketWith('resolved', ['closed']) }),
-      jsonResponse(200, { ticket: ticketWith('closed', []) }),
-    );
+    const fetchMock = stubApi({
+      [TICKET]: jsonResponse(200, { ticket: ticketWith('resolved', ['closed']) }),
+      [PATCH_STATUS]: jsonResponse(200, { ticket: ticketWith('closed', []) }),
+    });
     renderApp(`/tickets/${baseTicket.id}`);
 
     expect(screen.queryByLabelText('Status')).toBeNull();
@@ -147,7 +143,9 @@ describe('status control for customers', () => {
 
     expect(await screen.findByText('Status changed to Closed.')).toBeTruthy();
     expect(statusBadge().textContent).toBe('Closed');
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ status: 'closed' });
+    expect(requestsTo(fetchMock, PATCH_STATUS).map((call) => call.body)).toEqual([
+      { status: 'closed' },
+    ]);
     expect(screen.queryByRole('button', { name: 'Close ticket' })).toBeNull();
   });
 
@@ -157,7 +155,7 @@ describe('status control for customers', () => {
     ['closed', []],
   ])('shows no control on a %s ticket', async (status, allowed) => {
     login('customer');
-    stubFetch(jsonResponse(200, { ticket: ticketWith(status, allowed) }));
+    stubApi({ [TICKET]: jsonResponse(200, { ticket: ticketWith(status, allowed) }) });
     renderApp(`/tickets/${baseTicket.id}`);
 
     await screen.findByRole('heading', { level: 1, name: baseTicket.title });
@@ -167,15 +165,15 @@ describe('status control for customers', () => {
 
   it('shows the backend message when closing fails', async () => {
     login('customer');
-    stubFetch(
-      jsonResponse(200, { ticket: ticketWith('resolved', ['closed']) }),
-      jsonResponse(409, {
+    stubApi({
+      [TICKET]: jsonResponse(200, { ticket: ticketWith('resolved', ['closed']) }),
+      [PATCH_STATUS]: jsonResponse(409, {
         error: {
           code: 'INVALID_TRANSITION',
           message: 'Cannot change status from Closed to Closed',
         },
       }),
-    );
+    });
     renderApp(`/tickets/${baseTicket.id}`);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Close ticket' }));

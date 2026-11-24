@@ -24,6 +24,11 @@
   --color-priority-urgent-bg: #f2d3cc;
   --color-priority-urgent-text: #8a2b1b;
 
+  /* Internal notes: light amber card (olive text 7.46:1); badge uses the waiting tint */
+  --color-internal-bg: #faf1da;
+  --color-internal-badge-bg: var(--color-status-waiting-bg);
+  --color-internal-badge-text: var(--color-status-waiting-text);
+
   /* Feedback (aliases of the urgent tint, 6.13:1) */
   --color-error-bg: var(--color-priority-urgent-bg);
   --color-error-text: var(--color-priority-urgent-text);

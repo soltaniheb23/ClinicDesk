@@ -61,3 +61,13 @@ export function updateTicketAssignee(id, assignee) {
 export function getAgents({ signal } = {}) {
   return api.get('/api/v1/users/agents', { signal });
 }
+
+// Returns { items }, oldest first. Customers never receive internal notes.
+export function getComments(ticketId, { signal } = {}) {
+  return api.get(`/api/v1/tickets/${encodeURIComponent(ticketId)}/comments`, { signal });
+}
+
+// Returns { comment }. `internal` is only allowed for agents and admins.
+export function addComment(ticketId, { body, internal = false }) {
+  return api.post(`/api/v1/tickets/${encodeURIComponent(ticketId)}/comments`, { body, internal });
+}

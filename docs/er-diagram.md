@@ -38,8 +38,9 @@ erDiagram
         ObjectId ticket FK
         ObjectId author FK
         string body
-        boolean isInternal
+        boolean internal
         date createdAt
+        date updatedAt
     }
     ATTACHMENT {
         ObjectId _id PK
@@ -66,3 +67,4 @@ erDiagram
 - `passwordHash` is never returned by the API.
 - Audit logs are append-only.
 - Status changes follow the transition table in the API contract.
+- Internal comments are never returned to customers (see `docs/comments.md`).

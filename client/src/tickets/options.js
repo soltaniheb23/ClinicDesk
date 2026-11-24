@@ -52,3 +52,11 @@ export function validateTicket({ title, description, category, priority }) {
 
   return errors;
 }
+
+export const ROLE_LABELS = {
+  customer: 'Customer',
+  agent: 'Agent',
+  admin: 'Admin',
+};
+
+export const COMMENT_MAX_LENGTH = 2000;

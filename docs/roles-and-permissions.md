@@ -25,8 +25,8 @@ target behaviour for them.
 | Register, log in, view own profile (`/auth/me`) | Yes | Yes | Yes |
 | Create a ticket | Yes | Yes | Yes |
 | List and view tickets | Own only | All | All |
-| Comment on a ticket | Own tickets | All | All |
-| Write and read internal notes | No | Yes | Yes |
+| Comment on a ticket ([comments](comments.md)) | Own tickets, not closed | All, not closed | All, not closed |
+| Write and read internal notes | No (403, never returned) | Yes | Yes |
 | Upload and download attachments | Own tickets | All | All |
 | Change ticket status ([workflow](status-workflow.md)) | Close own resolved ticket | Yes | Yes |
 | Assign or claim a ticket ([assignment](assignment.md)) | No | Claim, or release own | Any active agent or admin |

@@ -35,6 +35,41 @@ export function stubFetch(...responses) {
   return fetchMock;
 }
 
+// Answers fetch by "METHOD /path" (for example 'PATCH /api/v1/tickets/1/status'), so a
+// test does not depend on the order in which a page's components send their requests.
+// A route takes a response, an Error (network failure), a function returning a promise, or
+// an array of those used in order (the last one repeats). Requests without a route get
+// 200 { items: [] }.
+export function stubApi(routes = {}) {
+  const queues = new Map(
+    Object.entries(routes).map(([route, value]) => [
+      route,
+      Array.isArray(value) ? [...value] : [value],
+    ]),
+  );
+  const fetchMock = vi.fn((url, init = {}) => {
+    const queue = queues.get(`${init.method ?? 'GET'} ${url}`);
+    if (!queue) return Promise.resolve(jsonResponse(200, { items: [] }));
+    const next = queue.length > 1 ? queue.shift() : queue[0];
+    if (typeof next === 'function') return next();
+    if (next instanceof Error) return Promise.reject(next);
+    return Promise.resolve(next);
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+// The requests a stubApi/stubFetch mock received for one "METHOD /path", with parsed bodies.
+export function requestsTo(fetchMock, route) {
+  return fetchMock.mock.calls
+    .filter(([url, init = {}]) => `${init.method ?? 'GET'} ${url}` === route)
+    .map(([url, init = {}]) => ({
+      url,
+      init,
+      body: init.body === undefined ? undefined : JSON.parse(init.body),
+    }));
+}
+
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{location.pathname}</div>;

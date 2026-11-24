@@ -8,11 +8,12 @@ import { PriorityBadge, StatusBadge } from '../tickets/Badges.jsx';
 import { formatDate } from '../tickets/format.js';
 import { CATEGORY_OPTIONS, STATUS_LABELS, labelFor } from '../tickets/options.js';
 import AssignControl from '../tickets/AssignControl.jsx';
+import CommentThread from '../tickets/CommentThread.jsx';
 import StatusControl from '../tickets/StatusControl.jsx';
 import '../tickets/tickets.css';
 
-// Ticket detail (wireframe 03) with the status and assignment controls. Comments and
-// attachments come in later tickets.
+// Ticket detail (wireframe 03) with the status and assignment controls and the comment
+// thread. Attachments come in a later ticket.
 function TicketDetailPage() {
   const { id } = useParams();
   const location = useLocation();
@@ -129,6 +130,7 @@ function TicketDetailPage() {
         <h2 id="ticket-description-heading">Description</h2>
         <p>{ticket.description}</p>
       </section>
+      <CommentThread key={ticket.id} ticket={ticket} />
     </article>
   );
 }
