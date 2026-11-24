@@ -272,7 +272,8 @@
 }
 
 /* Status control below the badges (wireframe 03 side panel). */
-.status-panel {
+.status-panel,
+.assign-panel {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3) var(--space-4);
@@ -285,19 +286,43 @@
   background: var(--color-paper);
 }
 
-.status-panel .field {
+.status-panel .field,
+.assign-panel .field {
   flex: 1 1 200px;
 }
 
-.status-panel .button-primary {
+.status-panel .button-primary,
+.assign-panel .button-primary {
   width: auto;
   padding: var(--space-2) var(--space-5);
 }
 
-.status-panel .button-secondary {
+.status-panel .button-secondary,
+.assign-panel .button-secondary {
   cursor: pointer;
 }
 
-.status-panel .form-error {
+.status-panel .form-error,
+.assign-panel .form-error {
   flex-basis: 100%;
+}
+
+.assignment {
+  max-width: 640px;
+  margin: var(--space-4) 0;
+}
+
+.assignee-line {
+  margin: 0;
+  font-weight: 600;
+}
+
+.assignment .assign-panel {
+  margin-top: var(--space-3);
+}
+
+.assign-panel .state {
+  flex: 1 1 100%;
+  padding: 0;
+  border: 0;
 }

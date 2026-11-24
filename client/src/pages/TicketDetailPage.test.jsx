@@ -37,8 +37,9 @@ describe('TicketDetailPage', () => {
     const meta = document.querySelector('dl.ticket-meta');
     expect(within(meta).getByText('IT')).toBeTruthy();
     expect(within(meta).getByText('Mara Jensen')).toBeTruthy();
-    expect(within(meta).getByText('Unassigned')).toBeTruthy();
     expect(within(meta).getByText('01.12.2026')).toBeTruthy();
+
+    expect(screen.getByRole('region', { name: 'Assignment' }).textContent).toBe('Unassigned');
 
     const description = screen.getByRole('region', { name: 'Description' });
     expect(description.textContent).toContain('Tried turning it off and on.');
@@ -46,8 +47,7 @@ describe('TicketDetailPage', () => {
     expect(screen.getByRole('link', { name: 'Back to tickets' }).getAttribute('href')).toBe(
       '/tickets',
     );
-    // Read-only for now: the only button is the header's Log out (no comment, status or
-    // assignment controls).
+    // A customer on an open ticket gets no controls: the only button is the header's Log out.
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Log out']);
 
     expect(fetchMock.mock.calls[0][0]).toBe(`/api/v1/tickets/${ticket.id}`);
@@ -58,7 +58,8 @@ describe('TicketDetailPage', () => {
     stubFetch(jsonResponse(200, { ticket: { ...ticket, assignee: { id: 'a1', name: 'Lena' } } }));
     renderApp(`/tickets/${ticket.id}`);
 
-    expect(await screen.findByText('Lena')).toBeTruthy();
+    expect(await screen.findByText('Assigned to Lena')).toBeTruthy();
+    expect(screen.queryByRole('form', { name: 'Ticket assignment' })).toBeNull();
   });
 
   it('shows "Ticket not found" on a 404', async () => {

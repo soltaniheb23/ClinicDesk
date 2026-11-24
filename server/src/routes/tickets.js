@@ -2,6 +2,7 @@ const express = require('express');
 const { z } = require('zod');
 const mongoose = require('mongoose');
 const Ticket = require('../models/Ticket');
+const User = require('../models/User');
 const { authenticate } = require('../auth/authenticate');
 const { canAccessOwnedResource } = require('../auth/authorize');
 const { validationError } = require('../validation');
@@ -73,6 +74,23 @@ const STATUS_LABELS = {
 const statusChangeSchema = z.object({
   status: z.enum(STATUSES, { error: `Status must be one of: ${STATUSES.join(', ')}` }),
 });
+
+const assigneeChangeSchema = z.object({
+  assignee: z.union(
+    [
+      z.null(),
+      z.string().refine((value) => mongoose.isValidObjectId(value), {
+        error: 'Assignee must be a user id or null',
+      }),
+    ],
+    { error: 'Assignee must be a user id or null' },
+  ),
+});
+
+const FORBIDDEN = {
+  error: { code: 'FORBIDDEN', message: 'You do not have permission to do this' },
+};
+const STAFF_ROLES = ['agent', 'admin'];
 
 function withPublicUsers(query) {
   return query
@@ -179,9 +197,7 @@ router.patch('/:id/status', async (request, response) => {
 
   if (!canTransition(currentStatus, nextStatus, role)) {
     if (role === 'customer' && isWorkflowTransition(currentStatus, nextStatus)) {
-      return response.status(403).json({
-        error: { code: 'FORBIDDEN', message: 'You do not have permission to do this' },
-      });
+      return response.status(403).json(FORBIDDEN);
     }
 
     return response.status(409).json({
@@ -216,6 +232,71 @@ router.patch('/:id/status', async (request, response) => {
   }
 
   return response.json({ ticket: serializeTicketFor(updated, request.user) });
+});
+
+// Assignment (docs/assignment.md). Checks, in order:
+// 404 not visible -> 403 customer -> 400 bad body -> 400 assignee is not an active agent or
+// admin -> 403 agent assigning someone else (or releasing a ticket that is not theirs) ->
+// 409 ticket is closed.
+router.patch('/:id/assignee', async (request, response) => {
+  const ticket = await findVisibleTicket(request);
+  if (!ticket) return response.status(404).json(NOT_FOUND);
+
+  const { user } = request;
+  if (!STAFF_ROLES.includes(user.role)) return response.status(403).json(FORBIDDEN);
+
+  const parsed = assigneeChangeSchema.safeParse(request.body ?? {});
+  if (!parsed.success) return validationError(response, parsed.error);
+
+  const nextAssigneeId = parsed.data.assignee;
+
+  if (nextAssigneeId !== null) {
+    const assignee = await User.findById(nextAssigneeId).select('role isActive').lean();
+    if (!assignee || !assignee.isActive || !STAFF_ROLES.includes(assignee.role)) {
+      return response.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Some fields are invalid',
+          details: [{ field: 'assignee', message: 'Assignee must be an active agent or admin' }],
+        },
+      });
+    }
+  }
+
+  const currentAssigneeId = ticket.assignee?._id?.toString() ?? null;
+
+  // Agents may only claim a ticket for themselves or release their own assignment.
+  if (user.role === 'agent') {
+    const isClaim = nextAssigneeId === user.id;
+    const isRelease = nextAssigneeId === null && currentAssigneeId === user.id;
+    if (!isClaim && !isRelease) return response.status(403).json(FORBIDDEN);
+  }
+
+  if (ticket.status === 'closed') {
+    return response.status(409).json({
+      error: { code: 'TICKET_CLOSED', message: 'A closed ticket cannot be reassigned' },
+    });
+  }
+
+  // Only applies if nobody changed the assignee (or closed the ticket) since we read it.
+  const updated = await withPublicUsers(
+    Ticket.findOneAndUpdate(
+      { _id: ticket._id, assignee: currentAssigneeId, status: { $ne: 'closed' } },
+      { $set: { assignee: nextAssigneeId } },
+      { returnDocument: 'after', runValidators: true },
+    ),
+  );
+
+  if (!updated) {
+    return response.status(409).json({
+      error: {
+        code: 'ASSIGNEE_CONFLICT',
+        message: 'The ticket was changed by someone else. Reload the ticket and try again.',
+      },
+    });
+  }
+
+  return response.json({ ticket: serializeTicketFor(updated, user) });
 });
 
 module.exports = router;

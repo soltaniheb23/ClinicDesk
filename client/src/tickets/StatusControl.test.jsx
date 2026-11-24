@@ -74,10 +74,16 @@ describe('status control for agents and admins', () => {
   it('shows a loading state while saving', async () => {
     login('admin');
     let resolve;
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(200, { ticket: ticketWith('open', ['in_progress']) }))
-      .mockImplementationOnce(() => new Promise((done) => (resolve = done)));
+    const ticketResponses = [
+      Promise.resolve(jsonResponse(200, { ticket: ticketWith('open', ['in_progress']) })),
+      new Promise((done) => (resolve = done)),
+    ];
+    // The admin's assignment control also loads the agent list; answer it separately.
+    const fetchMock = vi.fn((url) =>
+      url === '/api/v1/users/agents'
+        ? Promise.resolve(jsonResponse(200, { items: [] }))
+        : ticketResponses.shift(),
+    );
     vi.stubGlobal('fetch', fetchMock);
     renderApp(`/tickets/${baseTicket.id}`);
 

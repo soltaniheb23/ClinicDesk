@@ -1,6 +1,7 @@
 const express = require('express');
 const authRouter = require('./routes/auth');
 const ticketsRouter = require('./routes/tickets');
+const usersRouter = require('./routes/users');
 
 const app = express();
 const clientOrigin = (process.env.CLIENT_ORIGIN || '').replace(/\/+$/, '');
@@ -33,6 +34,7 @@ app.get('/api/v1/hello', (_request, response) => {
 
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/tickets', ticketsRouter);
+app.use('/api/v1/users', usersRouter);
 
 // eslint-disable-next-line no-unused-vars
 app.use((error, _request, response, _next) => {
