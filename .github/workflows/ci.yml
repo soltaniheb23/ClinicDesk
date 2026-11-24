@@ -10,9 +10,11 @@ permissions:
   contents: read
 
 jobs:
+  # The name is a required status check in the protect-main ruleset. Renaming it blocks every PR.
   server:
-    name: Server (lint + test + coverage)
+    name: Server (lint + test)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: ./server
@@ -67,6 +69,7 @@ jobs:
   client:
     name: Client (lint + test + build)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: ./client
