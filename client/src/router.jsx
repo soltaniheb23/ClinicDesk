@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './auth/ProtectedRoute.jsx';
 import AppLayout from './components/AppLayout.jsx';
+import CreateTicketPage from './pages/CreateTicketPage.jsx';
 import HealthCheckPage from './pages/HealthCheckPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
@@ -22,6 +23,7 @@ function AppRoutes() {
         }
       >
         <Route path="/tickets" element={<TicketsPage />} />
+        <Route path="/tickets/new" element={<CreateTicketPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

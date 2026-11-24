@@ -4,6 +4,7 @@ const User = require('../models/User');
 const { hashPassword, verifyPassword } = require('../auth/password');
 const { signToken } = require('../auth/token');
 const { authenticate, unauthenticated } = require('../auth/authenticate');
+const { validationError } = require('../validation');
 
 const router = express.Router();
 
@@ -37,19 +38,6 @@ const loginSchema = z.object({
     .min(1, { error: 'Password is required' })
     .refine(passwordMaxBytes, { error: 'Password must be at most 72 bytes' }),
 });
-
-function validationError(response, zodError) {
-  return response.status(400).json({
-    error: {
-      code: 'VALIDATION_ERROR',
-      message: 'Some fields are invalid',
-      details: zodError.issues.map((issue) => ({
-        field: issue.path.join('.'),
-        message: issue.message,
-      })),
-    },
-  });
-}
 
 router.post('/register', async (request, response) => {
   // Unknown keys such as "role" are stripped, so new accounts are always customers.

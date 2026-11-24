@@ -1,5 +1,6 @@
 const express = require('express');
 const authRouter = require('./routes/auth');
+const ticketsRouter = require('./routes/tickets');
 
 const app = express();
 const clientOrigin = (process.env.CLIENT_ORIGIN || '').replace(/\/+$/, '');
@@ -19,7 +20,8 @@ app.use((request, response, next) => {
   next();
 });
 
-app.use(express.json({ limit: '10kb' }));
+// Room for a 5000-character ticket description in multi-byte scripts (up to 4 bytes each).
+app.use(express.json({ limit: '32kb' }));
 
 app.get('/health', (_request, response) => {
   response.json({ status: 'ok' });
@@ -30,12 +32,19 @@ app.get('/api/v1/hello', (_request, response) => {
 });
 
 app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/tickets', ticketsRouter);
 
 // eslint-disable-next-line no-unused-vars
 app.use((error, _request, response, _next) => {
   if (error.type === 'entity.parse.failed') {
     return response.status(400).json({
       error: { code: 'VALIDATION_ERROR', message: 'Request body must be valid JSON' },
+    });
+  }
+
+  if (error.type === 'entity.too.large') {
+    return response.status(413).json({
+      error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large' },
     });
   }
 
