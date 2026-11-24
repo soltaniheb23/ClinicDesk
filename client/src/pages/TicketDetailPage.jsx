@@ -7,10 +7,11 @@ import Loading from '../components/Loading.jsx';
 import { PriorityBadge, StatusBadge } from '../tickets/Badges.jsx';
 import { formatDate } from '../tickets/format.js';
 import { CATEGORY_OPTIONS, STATUS_LABELS, labelFor } from '../tickets/options.js';
+import AssignControl from '../tickets/AssignControl.jsx';
 import StatusControl from '../tickets/StatusControl.jsx';
 import '../tickets/tickets.css';
 
-// Ticket detail (wireframe 03) with the status control. Comments, assignment and
+// Ticket detail (wireframe 03) with the status and assignment controls. Comments and
 // attachments come in later tickets.
 function TicketDetailPage() {
   const { id } = useParams();
@@ -19,7 +20,7 @@ function TicketDetailPage() {
   const [reloadCount, setReloadCount] = useState(0);
   const requestKey = `${id}:${reloadCount}`;
   const [result, setResult] = useState({ key: null });
-  const [statusMessage, setStatusMessage] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -74,7 +75,12 @@ function TicketDetailPage() {
 
   function handleStatusUpdated(updated) {
     setResult((previous) => ({ ...previous, ticket: updated }));
-    setStatusMessage(`Status changed to ${STATUS_LABELS[updated.status] ?? updated.status}.`);
+    setNotice(`Status changed to ${STATUS_LABELS[updated.status] ?? updated.status}.`);
+  }
+
+  function handleAssigneeUpdated(updated) {
+    setResult((previous) => ({ ...previous, ticket: updated }));
+    setNotice(updated.assignee ? `Assigned to ${updated.assignee.name}.` : 'Ticket unassigned.');
   }
 
   return (
@@ -88,9 +94,19 @@ function TicketDetailPage() {
         </div>
       </header>
       <StatusControl key={ticket.status} ticket={ticket} onUpdated={handleStatusUpdated} />
-      {statusMessage && (
+      <section className="assignment" aria-label="Assignment">
+        <p className="assignee-line">
+          {ticket.assignee ? `Assigned to ${ticket.assignee.name}` : 'Unassigned'}
+        </p>
+        <AssignControl
+          key={ticket.assignee?.id ?? 'unassigned'}
+          ticket={ticket}
+          onUpdated={handleAssigneeUpdated}
+        />
+      </section>
+      {notice && (
         <p className="form-success" role="status">
-          {statusMessage}
+          {notice}
         </p>
       )}
       <dl className="ticket-meta">
@@ -101,10 +117,6 @@ function TicketDetailPage() {
         <div>
           <dt>Created by</dt>
           <dd>{ticket.createdBy?.name ?? 'Deleted user'}</dd>
-        </div>
-        <div>
-          <dt>Assignee</dt>
-          <dd>{ticket.assignee?.name ?? 'Unassigned'}</dd>
         </div>
         <div>
           <dt>Created</dt>

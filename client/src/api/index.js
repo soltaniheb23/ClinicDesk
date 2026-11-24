@@ -50,3 +50,14 @@ export function getTicket(id, { signal } = {}) {
 export function updateTicketStatus(id, status) {
   return api.patch(`/api/v1/tickets/${encodeURIComponent(id)}/status`, { status });
 }
+
+// Returns { ticket }. `assignee` is a user id, or null to unassign. Agents may only pass
+// their own id (claim) or null for a ticket assigned to them (release).
+export function updateTicketAssignee(id, assignee) {
+  return api.patch(`/api/v1/tickets/${encodeURIComponent(id)}/assignee`, { assignee });
+}
+
+// Returns { items: [{ id, name }] }: active agents and admins (agent and admin only).
+export function getAgents({ signal } = {}) {
+  return api.get('/api/v1/users/agents', { signal });
+}

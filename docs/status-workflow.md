@@ -50,3 +50,8 @@ stateDiagram-v2
 
 `GET /tickets/{id}` and the PATCH response include `allowedNextStatuses` for the current
 user, so the UI offers only valid choices without repeating these rules.
+
+## Assignment
+
+Assigning a ticket does not change its status, and changing the status does not change
+the assignee. Closed tickets cannot be reassigned. See [assignment.md](assignment.md).

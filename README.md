@@ -82,6 +82,7 @@ The client and server are deployed separately. Set these environment variables i
 - Data model (ER diagram): [`docs/er-diagram.md`](docs/er-diagram.md)
 - Roles and permissions: [`docs/roles-and-permissions.md`](docs/roles-and-permissions.md)
 - Ticket status workflow: [`docs/status-workflow.md`](docs/status-workflow.md)
+- Ticket assignment: [`docs/assignment.md`](docs/assignment.md)
 
 To view the API contract as interactive documentation, paste `docs/openapi.yaml` into [Swagger Editor](https://editor.swagger.io).
 
