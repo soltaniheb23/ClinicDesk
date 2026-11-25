@@ -18,6 +18,7 @@ const {
   searchText,
   strictQuerySchema,
 } = require('../queryParams');
+const { recordAudit } = require('../audit/record');
 const { validationError } = require('../validation');
 
 const router = express.Router();
@@ -145,12 +146,25 @@ router.post('/', requireRole('admin'), async (request, response) => {
 
   try {
     const user = await User.create({ ...fields, passwordHash: await hashPassword(password) });
+    await recordAudit({
+      actor: request.user.id,
+      action: 'user.created',
+      entityType: 'user',
+      entityId: user._id,
+      metadata: { role: user.role },
+    });
     return response.status(201).json({ user: serializeUser(user) });
   } catch (error) {
     if (error.code === 11000) return response.status(409).json(EMAIL_TAKEN);
     throw error;
   }
 });
+
+// The audit action for each field PATCH /users/:id can change (docs/audit-log.md).
+const AUDITED_FIELDS = [
+  ['role', 'user.role_changed'],
+  ['isActive', 'user.active_changed'],
+];
 
 function isActiveAdmin(user) {
   return user.role === 'admin' && user.isActive;
@@ -194,6 +208,19 @@ router.patch('/:id', requireRole('admin'), async (request, response) => {
       await User.findOneAndUpdate({ _id: target._id, ...after }, { $set: before });
       return response.status(409).json(LAST_ADMIN);
     }
+  }
+
+  // One entry per field that really changed (a role and an active-state change in one
+  // request are two entries; sending the current value records nothing).
+  for (const [field, action] of AUDITED_FIELDS) {
+    if (before[field] === after[field]) continue;
+    await recordAudit({
+      actor: request.user.id,
+      action,
+      entityType: 'user',
+      entityId: target._id,
+      metadata: { from: before[field], to: after[field] },
+    });
   }
 
   return response.json({ user: serializeUser(updated) });

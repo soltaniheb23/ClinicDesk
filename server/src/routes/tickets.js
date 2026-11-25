@@ -6,6 +6,7 @@ const Ticket = require('../models/Ticket');
 const User = require('../models/User');
 const { authenticate } = require('../auth/authenticate');
 const { canAccessOwnedResource } = require('../auth/authorize');
+const { recordAudit } = require('../audit/record');
 const { validationError } = require('../validation');
 const {
   STATUSES,
@@ -250,6 +251,14 @@ router.patch('/:id/status', async (request, response) => {
     });
   }
 
+  await recordAudit({
+    actor: request.user.id,
+    action: 'ticket.status_changed',
+    entityType: 'ticket',
+    entityId: ticket._id,
+    metadata: { from: currentStatus, to: nextStatus },
+  });
+
   return response.json({ ticket: serializeTicketFor(updated, request.user) });
 });
 
@@ -314,6 +323,15 @@ router.patch('/:id/assignee', async (request, response) => {
       },
     });
   }
+
+  // Names are a snapshot at the time of the change ({ id, name } or null = unassigned).
+  await recordAudit({
+    actor: user.id,
+    action: 'ticket.assignee_changed',
+    entityType: 'ticket',
+    entityId: ticket._id,
+    metadata: { from: publicUser(ticket.assignee), to: publicUser(updated.assignee) },
+  });
 
   return response.json({ ticket: serializeTicketFor(updated, user) });
 });
