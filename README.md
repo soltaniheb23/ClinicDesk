@@ -97,6 +97,29 @@ The client and server are deployed separately. Set these environment variables i
 | Render (server) | `CLIENT_ORIGIN` | The Vercel URL, no trailing slash 		   |
 | Render (server) | `MONGODB_URI` 	| The MongoDB Atlas connection string (secret) |
 
+## Security
+
+The API sends security headers on every response (helmet, with a JSON-only CSP), allows only
+the listed frontend origins (CORS), and rate limits logins, registrations and the whole API.
+The client sends its own headers and CSP from `client/vercel.json`. The OWASP Top 10 review,
+the secret scan and the open findings are in
+[`docs/security-review.md`](docs/security-review.md).
+
+| Variable (server) | Default | Meaning |
+|---|---|---|
+| `CLIENT_ORIGIN` | none | Allowed frontend origins, comma-separated, exact matches only (`https://clinicdesk.vercel.app,https://staging.example.com`). `*` stops the server at startup. |
+| `TRUST_PROXY` | `1` in production, otherwise `false` | Proxy hops in front of the API, so the rate limits see the client's IP. Render needs `1`. `true` is refused. |
+| `JWT_SECRET` | none | At least 32 characters in production. |
+| `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_LOGIN_WINDOW_MS` | 10 per 15 minutes | Failed logins per IP. Successful logins are not counted. |
+| `RATE_LIMIT_REGISTER_MAX`, `RATE_LIMIT_REGISTER_WINDOW_MS` | 5 per hour | Registrations per IP. |
+| `RATE_LIMIT_GLOBAL_MAX`, `RATE_LIMIT_GLOBAL_WINDOW_MS` | 300 per 15 minutes | All `/api/v1` requests per IP (`/health` is never limited). |
+
+Limited requests get `429 RATE_LIMITED` with a `Retry-After` header. The counters are kept in
+memory, which suits the single Render instance. The limits are off when `NODE_ENV=test`.
+
+If the Render API URL changes, update `connect-src` in `client/vercel.json` too; otherwise the
+browser blocks every API call.
+
 ## API and data model
 
 - Base URL (local): `http://localhost:3000/api/v1`
@@ -109,6 +132,7 @@ The client and server are deployed separately. Set these environment variables i
 - Ticket list filters, search and sorting: [`docs/ticket-list.md`](docs/ticket-list.md)
 - Admin user management and the first admin: [`docs/user-management.md`](docs/user-management.md)
 - Audit log: [`docs/audit-log.md`](docs/audit-log.md)
+- Security review (OWASP Top 10): [`docs/security-review.md`](docs/security-review.md)
 - Responsive layout and screenshots: [`docs/responsive/`](docs/responsive/README.md)
 
 To view the API contract as interactive documentation, paste `docs/openapi.yaml` into [Swagger Editor](https://editor.swagger.io).

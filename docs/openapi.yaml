@@ -5,7 +5,9 @@ info:
   description: >
     Helpdesk API for a clinic. Draft contract for ticket CD-5. Endpoints need a
     bearer token unless they set `security: []`; role rules are in
-    docs/roles-and-permissions.md.
+    docs/roles-and-permissions.md. Every /api/v1 route may answer 429 RATE_LIMITED
+    (components/responses/RateLimited) once a client exceeds the global limit; login and
+    register also have their own, stricter limits. Unknown paths answer a JSON 404.
 servers:
   - url: http://localhost:3000/api/v1
     description: Local development
@@ -97,6 +99,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example:
                 error: { code: EMAIL_TAKEN, message: An account with this email already exists }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /auth/login:
     post:
@@ -146,8 +149,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example:
                 error: { code: INVALID_CREDENTIALS, message: Invalid email or password }
-        '429':
-          description: Too many login attempts
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /auth/me:
     get:
@@ -1065,6 +1067,27 @@ components:
       required: true
       schema: { type: string }
   responses:
+    RateLimited:
+      description: >
+        RATE_LIMITED. Too many requests from this client IP. Login counts failed attempts
+        only (10 per 15 minutes by default), register 5 per hour, and every /api/v1 route
+        together 300 per 15 minutes. All limits can be changed with RATE_LIMIT_* (see
+        docs/security-review.md). The request is not processed, so a limited login writes
+        no audit entry.
+      headers:
+        Retry-After:
+          description: Seconds until the client may try again.
+          schema: { type: integer, example: 900 }
+        RateLimit:
+          description: Remaining requests and reset time (IETF draft 7).
+          schema: { type: string, example: 'limit=10, remaining=0, reset=900' }
+        RateLimit-Policy:
+          schema: { type: string, example: '10;w=900' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: { code: RATE_LIMITED, message: Too many login attempts. Try again in 15 minutes. }
     Unauthorized:
       description: >
         UNAUTHENTICATED. The token is missing, malformed, expired or wrongly signed,

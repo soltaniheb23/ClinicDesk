@@ -1,4 +1,13 @@
-const { getStartupErrors } = require('../src/config');
+const {
+  getStartupErrors,
+  parseClientOrigins,
+  parseTrustProxy,
+  RATE_LIMIT_VARIABLES,
+} = require('../src/config');
+
+// A placeholder of the minimum length, not a real secret.
+const LONG_SECRET = 'x'.repeat(32);
+const BASE = { MONGODB_URI: 'mongodb://db', JWT_SECRET: LONG_SECRET };
 
 describe('getStartupErrors', () => {
   it('requires MONGODB_URI', () => {
@@ -13,13 +22,86 @@ describe('getStartupErrors', () => {
     ]);
   });
 
-  it('allows a missing JWT_SECRET outside production', () => {
+  it('refuses a JWT_SECRET shorter than 32 characters in production', () => {
+    expect(
+      getStartupErrors({ ...BASE, JWT_SECRET: 'x'.repeat(31), NODE_ENV: 'production' }),
+    ).toEqual([expect.stringContaining('JWT_SECRET must be at least 32 characters')]);
+  });
+
+  it('allows a missing or short JWT_SECRET outside production', () => {
     expect(getStartupErrors({ MONGODB_URI: 'mongodb://db', NODE_ENV: 'development' })).toEqual([]);
+    expect(getStartupErrors({ ...BASE, JWT_SECRET: 'short', NODE_ENV: 'development' })).toEqual([]);
   });
 
   it('passes with all required variables in production', () => {
     expect(
-      getStartupErrors({ MONGODB_URI: 'mongodb://db', JWT_SECRET: 'x', NODE_ENV: 'production' }),
+      getStartupErrors({
+        ...BASE,
+        NODE_ENV: 'production',
+        CLIENT_ORIGIN: 'https://clinicdesk.vercel.app, https://staging.example.com/',
+        TRUST_PROXY: '1',
+        RATE_LIMIT_LOGIN_MAX: '20',
+      }),
     ).toEqual([]);
+  });
+
+  it.each(['*', 'https://clinicdesk.vercel.app,*', ' * '])(
+    'refuses "*" in CLIENT_ORIGIN (%s)',
+    (value) => {
+      expect(getStartupErrors({ ...BASE, CLIENT_ORIGIN: value })).toEqual([
+        expect.stringContaining('CLIENT_ORIGIN must not contain "*"'),
+      ]);
+    },
+  );
+
+  it.each(['clinicdesk.vercel.app', 'https://clinicdesk.vercel.app/app', 'ftp://files.example'])(
+    'refuses a CLIENT_ORIGIN entry that is not an origin (%s)',
+    (value) => {
+      expect(getStartupErrors({ ...BASE, CLIENT_ORIGIN: value })).toEqual([
+        expect.stringContaining('is not an origin'),
+      ]);
+    },
+  );
+
+  it.each(['true', 'yes', '-1', '1.5'])('refuses TRUST_PROXY=%s', (value) => {
+    expect(getStartupErrors({ ...BASE, TRUST_PROXY: value })).toEqual([
+      expect.stringContaining('TRUST_PROXY must be'),
+    ]);
+  });
+
+  it.each(RATE_LIMIT_VARIABLES)('refuses a %s that is not a positive whole number', (name) => {
+    for (const value of ['0', '-5', 'ten', '1.5']) {
+      expect(getStartupErrors({ ...BASE, [name]: value })).toEqual([
+        `${name} must be a whole number greater than 0.`,
+      ]);
+    }
+  });
+});
+
+describe('parseClientOrigins', () => {
+  it('splits, trims, removes trailing slashes, drops empty entries and duplicates', () => {
+    expect(
+      parseClientOrigins(' https://a.example/ ,, https://b.example:8443//,https://a.example'),
+    ).toEqual(['https://a.example', 'https://b.example:8443']);
+  });
+
+  it('never returns "*" and handles a missing value', () => {
+    expect(parseClientOrigins('*, https://a.example')).toEqual(['https://a.example']);
+    expect(parseClientOrigins(undefined)).toEqual([]);
+  });
+});
+
+describe('parseTrustProxy', () => {
+  it('defaults to 1 in production and false elsewhere', () => {
+    expect(parseTrustProxy({ NODE_ENV: 'production' })).toBe(1);
+    expect(parseTrustProxy({ NODE_ENV: 'development' })).toBe(false);
+    expect(parseTrustProxy({ NODE_ENV: 'production', TRUST_PROXY: ' ' })).toBe(1);
+  });
+
+  it('reads false, 0 and hop counts', () => {
+    expect(parseTrustProxy({ NODE_ENV: 'production', TRUST_PROXY: 'false' })).toBe(false);
+    expect(parseTrustProxy({ TRUST_PROXY: '0' })).toBe(false);
+    expect(parseTrustProxy({ TRUST_PROXY: '2' })).toBe(2);
+    expect(parseTrustProxy({ TRUST_PROXY: 'true' })).toBeNull();
   });
 });
