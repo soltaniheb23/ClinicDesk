@@ -117,8 +117,10 @@ the secret scan and the open findings are in
 Limited requests get `429 RATE_LIMITED` with a `Retry-After` header. The counters are kept in
 memory, which suits the single Render instance. The limits are off when `NODE_ENV=test`.
 
-If the Render API URL changes, update `connect-src` in `client/vercel.json` too; otherwise the
-browser blocks every API call.
+The client's CSP (`connect-src` in `client/vercel.json`) allows the API at
+`https://clinicdesk-api-2uh0.onrender.com`. When the Render service URL changes,
+`connect-src` in `client/vercel.json` must be changed too, otherwise the browser blocks all
+API calls.
 
 ## API and data model
 
@@ -161,8 +163,11 @@ the client. The API deployment is described by [`render.yaml`](render.yaml).
 	`/health`; its hello endpoint is `/api/v1/hello`.
 3. In Vercel, import the repository with `client` as the Root Directory. Set
 	`VITE_API_URL` to the Render API origin (for example,
-	`https://clinicdesk-api.onrender.com`) for the Preview and Production
-	environments, then deploy.
+	`https://<your-api>.onrender.com`) for the Preview and Production
+	environments, then deploy. The same origin must be listed in `connect-src` in
+	`client/vercel.json`: when the Render service URL changes, `connect-src` must be
+	changed too, otherwise the browser blocks all API calls ("Could not reach the
+	ClinicDesk API").
 4. Open `/health-check` on the Vercel deployment. The page should show `Hello from ClinicDesk API`,
 	confirming the frontend can reach the deployed backend. `client/vercel.json`
 	rewrites every path to `index.html` so client-side routes work on reload.

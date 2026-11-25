@@ -9,7 +9,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const API_ORIGIN = 'https://clinicdesk-api.onrender.com';
+// The real Render service URL (VITE_API_URL on Vercel). When the Render service URL
+// changes, change connect-src in client/vercel.json and this constant together.
+const API_ORIGIN = 'https://clinicdesk-api-2uh0.onrender.com';
 
 const vercel = JSON.parse(readFileSync(join(import.meta.dirname, '../../vercel.json'), 'utf8'));
 const rule = vercel.headers.find((entry) => entry.source === '/(.*)');
@@ -48,6 +50,13 @@ describe('vercel.json security headers', () => {
 
   it('lets the app call itself and the API origin, nothing else', () => {
     expect(csp['connect-src']).toEqual(["'self'", API_ORIGIN]);
+  });
+
+  it('allows no wildcard in connect-src (no "*", no scheme-only source)', () => {
+    for (const source of csp['connect-src']) {
+      expect(source).not.toContain('*');
+      expect(source).not.toMatch(/^[a-z]+:$/);
+    }
   });
 
   it('never uses wildcards, unsafe-inline, unsafe-eval or third-party font hosts', () => {
