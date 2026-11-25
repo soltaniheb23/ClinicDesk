@@ -4,8 +4,8 @@ import './AppLayout.css';
 
 const ROLE_LABELS = { customer: 'Customer', agent: 'Agent', admin: 'Admin' };
 
-// Layout for logged-in pages: top bar with the app name, the admin's "Users" link, the user
-// and a Log out button.
+// Layout for logged-in pages: top bar with the app name, the admin's "Users" and "Audit log"
+// links, the user and a Log out button.
 function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -25,6 +25,9 @@ function AppLayout() {
           <nav className="app-nav" aria-label="Admin">
             <NavLink className="app-nav-link" to="/admin/users">
               Users
+            </NavLink>
+            <NavLink className="app-nav-link" to="/audit-log">
+              Audit log
             </NavLink>
           </nav>
         )}

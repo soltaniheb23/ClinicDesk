@@ -5,6 +5,7 @@ const { hashPassword, verifyPassword } = require('../auth/password');
 const { signToken } = require('../auth/token');
 const { authenticate, unauthenticated } = require('../auth/authenticate');
 const { EMAIL_TAKEN, email, loginPassword, name, newPassword } = require('../auth/userFields');
+const { auditEmail, recordAudit } = require('../audit/record');
 const { validationError } = require('../validation');
 
 const router = express.Router();
@@ -55,12 +56,26 @@ router.post('/login', async (request, response) => {
   const passwordMatches = await verifyPassword(password, user?.passwordHash);
 
   if (!user || !passwordMatches || !user.isActive) {
+    // Only the attempted email is kept: never the password, and not whether the account
+    // exists or is deactivated (the answer is the same for all three).
+    await recordAudit({
+      action: 'auth.login_failed',
+      entityType: 'user',
+      metadata: { email: auditEmail(userEmail) },
+    });
     return response.status(401).json({
       error: { code: 'INVALID_CREDENTIALS', message: INVALID_CREDENTIALS },
     });
   }
 
-  return response.json({ token: signToken(user), user });
+  const token = signToken(user);
+  await recordAudit({
+    actor: user._id,
+    action: 'auth.login',
+    entityType: 'user',
+    entityId: user._id,
+  });
+  return response.json({ token, user });
 });
 
 router.get('/me', authenticate, async (request, response) => {
