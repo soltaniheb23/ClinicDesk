@@ -29,6 +29,8 @@ target behaviour for them.
 | Register, log in, view own profile (`/auth/me`) | Yes | Yes | Yes |
 | Create a ticket | Yes | Yes | Yes |
 | List and view tickets | Own only | All | All |
+| Filter, search and sort the ticket list ([ticket list](ticket-list.md)) | Own only, any filter | All | All |
+| Filter the list by assignee (`me`, `unassigned`, a user id) | No (403) | Yes | Yes |
 | Comment on a ticket ([comments](comments.md)) | Own tickets, not closed | All, not closed | All, not closed |
 | Write and read internal notes | No (403, never returned) | Yes | Yes |
 | Upload and download attachments | Own tickets | All | All |

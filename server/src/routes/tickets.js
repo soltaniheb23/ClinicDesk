@@ -13,26 +13,13 @@ const {
   canTransition,
   isWorkflowTransition,
 } = require('../tickets/statusWorkflow');
+const { buildListFilter, buildListPipeline, listQuerySchema } = require('../tickets/listQuery');
 
 const router = express.Router();
 
 const NOT_FOUND = { error: { code: 'NOT_FOUND', message: 'Ticket not found' } };
 // Only these user fields ever leave the server inside a ticket (never email or passwordHash).
 const PUBLIC_USER_FIELDS = 'name';
-
-const listQuerySchema = z.object({
-  page: z.coerce
-    .number({ error: 'Page must be a whole number of at least 1' })
-    .int({ error: 'Page must be a whole number of at least 1' })
-    .min(1, { error: 'Page must be a whole number of at least 1' })
-    .default(1),
-  limit: z.coerce
-    .number({ error: 'Limit must be a whole number from 1 to 50' })
-    .int({ error: 'Limit must be a whole number from 1 to 50' })
-    .min(1, { error: 'Limit must be a whole number from 1 to 50' })
-    .max(50, { error: 'Limit must be a whole number from 1 to 50' })
-    .default(10),
-});
 
 function publicUser(user) {
   return user ? { id: user._id.toString(), name: user.name } : null;
@@ -157,8 +144,10 @@ router.post('/', async (request, response) => {
   return response.status(201).json({ ticket: serializeTicket(ticket) });
 });
 
-// Customers see their own tickets; agents and admins see all. Newest first.
-// Filters (status, priority, search, ...) come in CD-17.
+// Customers see their own tickets; agents and admins see all (docs/ticket-list.md).
+// Checks, in order: 400 bad query -> 403 customer filters by assignee. The customer scope
+// is part of the filter, so filters and search only ever narrow it; the count and the
+// page use the same filter.
 router.get('/', async (request, response) => {
   const parsed = listQuerySchema.safeParse(request.query ?? {});
 
@@ -166,17 +155,21 @@ router.get('/', async (request, response) => {
     return validationError(response, parsed.error);
   }
 
-  const { page, limit } = parsed.data;
-  const filter = request.user.role === 'customer' ? { createdBy: request.user.id } : {};
+  const query = parsed.data;
+  if (query.assignee !== undefined && !STAFF_ROLES.includes(request.user.role)) {
+    return response.status(403).json(FORBIDDEN);
+  }
 
-  const [tickets, total] = await Promise.all([
-    withPublicUsers(
-      Ticket.find(filter)
-        .sort({ createdAt: -1, _id: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit),
-    ),
+  const { page, limit } = query;
+  const filter = buildListFilter(query, request.user);
+
+  const [rows, total] = await Promise.all([
+    Ticket.aggregate(buildListPipeline(filter, query)),
     Ticket.countDocuments(filter),
+  ]);
+  const tickets = await Ticket.populate(rows, [
+    { path: 'createdBy', select: PUBLIC_USER_FIELDS },
+    { path: 'assignee', select: PUBLIC_USER_FIELDS },
   ]);
 
   return response.json({
