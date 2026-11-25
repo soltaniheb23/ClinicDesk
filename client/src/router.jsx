@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './auth/ProtectedRoute.jsx';
 import AppLayout from './components/AppLayout.jsx';
+import AuditLogPage from './pages/AuditLogPage.jsx';
 import CreateTicketPage from './pages/CreateTicketPage.jsx';
 import TicketDetailPage from './pages/TicketDetailPage.jsx';
 import HealthCheckPage from './pages/HealthCheckPage.jsx';
@@ -32,6 +33,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute roles={['admin']}>
               <UsersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/audit-log"
+          element={
+            <ProtectedRoute roles={['admin']}>
+              <AuditLogPage />
             </ProtectedRoute>
           }
         />
