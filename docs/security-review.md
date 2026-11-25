@@ -60,12 +60,16 @@ The status is one of:
   `Referrer-Policy: strict-origin-when-cross-origin`, and a `Permissions-Policy` that turns
   off camera, microphone, geolocation, payment and USB.
 - CSP: `default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src
-  'self'; connect-src 'self' https://clinicdesk-api.onrender.com; object-src 'none';
+  'self'; connect-src 'self' https://clinicdesk-api-2uh0.onrender.com; object-src 'none';
   base-uri 'self'; form-action 'self'; frame-ancestors 'none'`.
   - Fonts are self-hosted with `@fontsource`. No Google Fonts hosts are needed.
   - The build has no inline scripts, inline styles or `data:` URLs.
-  - **`connect-src` must list the production API origin** (`VITE_API_URL` on Vercel). If the
-    Render URL changes, update it there, or the browser blocks every API call.
+  - **`connect-src` must list the production API origin** (`VITE_API_URL` on Vercel), today
+    `https://clinicdesk-api-2uh0.onrender.com`. **When the Render service URL changes,
+    `connect-src` in `client/vercel.json` must be changed too, otherwise the browser blocks
+    all API calls.** This already happened once: the first version of this policy listed a
+    guessed URL without the suffix Render adds to the service name, and every call failed
+    with "Could not reach the ClinicDesk API" until the hotfix (`fix/CD-24-csp-api-url`).
     `client/src/security/vercelHeaders.test.js` guards this, because JSON cannot hold a
     comment.
 - How the policy was checked: the production build was served locally with exactly these
