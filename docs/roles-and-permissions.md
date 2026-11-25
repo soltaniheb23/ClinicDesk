@@ -22,8 +22,8 @@ deactivated-user tokens and other customers' tickets) in
 
 ## What each role may do
 
-Attachments, the audit log and the metrics dashboard are still planned; their rows are the
-target behaviour. Every other row is implemented and tested.
+Attachments and the metrics dashboard are still planned; their rows are the target
+behaviour. Every other row is implemented and tested.
 
 | Action | Customer | Agent | Admin |
 |---|---|---|---|
@@ -38,5 +38,5 @@ target behaviour. Every other row is implemented and tested.
 | Change ticket status ([workflow](status-workflow.md)) | Close own resolved ticket | Yes | Yes |
 | Assign or claim a ticket ([assignment](assignment.md)) | No | Claim, or release own | Any active agent or admin |
 | Manage users: list, create, change role, deactivate ([user management](user-management.md)) | No (403) | No (403) | Yes, except their own account |
-| View audit log | No | No | Yes |
+| View audit log ([audit log](audit-log.md), read only, nobody can edit or delete entries) | No (403) | No (403) | Yes |
 | View metrics dashboard | No | No | Yes |

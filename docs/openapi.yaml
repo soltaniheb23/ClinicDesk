@@ -969,10 +969,67 @@ paths:
   /audit-logs:
     get:
       tags: [Admin]
-      summary: List audit entries (admin, read only)
+      summary: List audit entries, newest first (admin, read only)
+      description: >
+        Admin only. Who did what and when: logins (success and failed), ticket status and
+        assignment changes, and users created or changed by an admin. Sorted by
+        `createdAt` then `_id`, newest first. There is no route to create, change or delete
+        entries. All parameters are optional; an unknown parameter, a repeated parameter
+        or an operator form such as `action[$ne]=auth.login` is a 400. Order of checks:
+        401 -> 403 -> 400. See docs/audit-log.md.
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+        - { name: action, in: query, schema: { $ref: '#/components/schemas/AuditAction' } }
+        - name: actor
+          in: query
+          description: Only entries by this user id.
+          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+        - { name: entityType, in: query, schema: { type: string, enum: [user, ticket] } }
+        - name: from
+          in: query
+          description: >
+            Inclusive start. An ISO date-time with a time zone (`2026-11-20T00:00:00Z`,
+            `2026-11-20T01:00:00+01:00`) or a plain date (read as 00:00 UTC).
+          schema: { type: string, example: '2026-11-20T00:00:00.000Z' }
+        - name: to
+          in: query
+          description: >
+            Inclusive end, same formats as `from`; a plain date covers that whole UTC day.
+            Must not be before `from`.
+          schema: { type: string, example: '2026-11-25T23:59:59.999Z' }
       responses:
         '200':
-          description: Audit entries, newest first
+          description: One page of audit entries
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditLogPage' }
+              example:
+                items:
+                  - id: 6651c9e0c3d4e5f6a7b8c9e5
+                    actor: null
+                    action: auth.login_failed
+                    entityType: user
+                    entityId: null
+                    entityLabel: null
+                    metadata: { email: mara@example.com }
+                    createdAt: '2026-11-25T10:05:00.000Z'
+                  - id: 6651c9e0c3d4e5f6a7b8c9e4
+                    actor: { id: 6650d4b2c3d4e5f6a7b8c9d2, name: Anton Weber }
+                    action: ticket.assignee_changed
+                    entityType: ticket
+                    entityId: 6651b2a7c3d4e5f6a7b8c9d1
+                    entityLabel: Printer in reception not working
+                    metadata:
+                      from: null
+                      to: { id: 6650c3a1b2c3d4e5f6a7b8c9, name: Lena Berg }
+                    createdAt: '2026-11-25T10:04:00.000Z'
+                page: 1
+                limit: 10
+                total: 2
+                totalPages: 1
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
   /metrics/summary:
@@ -1106,6 +1163,48 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/AdminUser' }
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+    AuditAction:
+      type: string
+      enum:
+        - auth.login
+        - auth.login_failed
+        - ticket.status_changed
+        - ticket.assignee_changed
+        - user.created
+        - user.role_changed
+        - user.active_changed
+    AuditEntry:
+      type: object
+      description: >
+        One audit entry. `metadata` depends on the action (docs/audit-log.md) and never
+        holds passwords, hashes, tokens or request bodies.
+      required: [id, actor, action, entityType, entityId, entityLabel, metadata, createdAt]
+      properties:
+        id: { type: string }
+        actor:
+          description: The user who acted (id and name only); null for a failed login or a deleted user.
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/UserRef' }]
+        action: { $ref: '#/components/schemas/AuditAction' }
+        entityType: { type: string, enum: [user, ticket] }
+        entityId: { type: string, nullable: true, description: Null for a failed login. }
+        entityLabel:
+          type: string
+          nullable: true
+          description: The user's current name or the ticket's title; null if it no longer exists.
+        metadata: { type: object, additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+    AuditLogPage:
+      type: object
+      required: [items, page, limit, total, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AuditEntry' }
         page: { type: integer }
         limit: { type: integer }
         total: { type: integer }
