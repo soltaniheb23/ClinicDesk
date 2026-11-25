@@ -107,6 +107,7 @@ The client and server are deployed separately. Set these environment variables i
 - Ticket assignment: [`docs/assignment.md`](docs/assignment.md)
 - Comments and internal notes: [`docs/comments.md`](docs/comments.md)
 - Ticket list filters, search and sorting: [`docs/ticket-list.md`](docs/ticket-list.md)
+- Responsive layout and screenshots: [`docs/responsive/`](docs/responsive/README.md)
 
 To view the API contract as interactive documentation, paste `docs/openapi.yaml` into [Swagger Editor](https://editor.swagger.io).
 

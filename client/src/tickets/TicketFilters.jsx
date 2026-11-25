@@ -44,8 +44,9 @@ function SearchBox({ value, onCommit }) {
 }
 
 // Toolbar above the ticket list (wireframe 02). Every control is labelled; the assignee
-// filter and the sort select are for agents and admins only.
-function TicketFilters({ state, role, isStaff, active, onChange, onSearch, onClear }) {
+// filter is for agents and admins only; the sort select is shown when `showSort` is true
+// (staff, and every role on phones, where the table headers are replaced by cards).
+function TicketFilters({ state, role, showSort, active, onChange, onSearch, onClear }) {
   return (
     <div className="ticket-filters" role="search" aria-label="Filter tickets">
       <div className="ticket-filters-search">
@@ -71,7 +72,7 @@ function TicketFilters({ state, role, isStaff, active, onChange, onSearch, onCle
         </div>
       ))}
 
-      {isStaff && (
+      {showSort && (
         <div className="ticket-filters-select">
           <FormField
             id="ticket-sort"

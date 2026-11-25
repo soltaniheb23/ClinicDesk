@@ -5,6 +5,8 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import Loading from '../components/Loading.jsx';
+import { MEDIA } from '../layout/breakpoints.js';
+import { useMediaQuery } from '../layout/useMediaQuery.js';
 import '../components/forms.css';
 import { PriorityBadge, StatusBadge } from '../tickets/Badges.jsx';
 import TicketFilters from '../tickets/TicketFilters.jsx';
@@ -99,6 +101,47 @@ function TicketTable({ tickets, listSearch, sortState, onSort }) {
   );
 }
 
+// Below the tablet breakpoint (CD-36): one card per ticket instead of the table. Only one of
+// the two is rendered, so screen readers get either a real table or a list of cards with a
+// heading and labelled values, never both.
+function TicketCards({ tickets, listSearch, sortState }) {
+  return (
+    <ul className="ticket-cards" aria-label={`Tickets, ${describeSort(sortState)}`}>
+      {tickets.map((ticket) => (
+        <li className="ticket-card" key={ticket.id}>
+          <h2 className="ticket-card-title">
+            <Link className="ticket-title-link" to={`/tickets/${ticket.id}`} state={{ listSearch }}>
+              {ticket.title}
+            </Link>
+          </h2>
+          <dl className="ticket-card-meta">
+            <div className="ticket-card-badges">
+              <dt className="visually-hidden">Status</dt>
+              <dd>
+                <StatusBadge status={ticket.status} />
+              </dd>
+              <dt className="visually-hidden">Priority</dt>
+              <dd>
+                <PriorityBadge priority={ticket.priority} />
+              </dd>
+            </div>
+            <div>
+              <dt>Assignee</dt>
+              <dd>{ticket.assignee?.name ?? 'Unassigned'}</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>
+                <time dateTime={ticket.createdAt}>{formatDate(ticket.createdAt)}</time>
+              </dd>
+            </div>
+          </dl>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Pagination({ page, totalPages, onChange }) {
   return (
     <nav className="pagination" aria-label="Pagination">
@@ -133,6 +176,9 @@ function TicketsPage() {
   const { user } = useAuth();
   const role = user?.role;
   const isStaff = role === 'agent' || role === 'admin';
+  // Phones get cards, where the column headers that sort are gone, so the sort select is
+  // shown to every role there.
+  const isWide = useMediaQuery(MEDIA.tablet);
   const [searchParams, setSearchParams] = useSearchParams();
   const page = pageFromSearch(searchParams);
   const listState = listStateFromSearch(searchParams, role);
@@ -233,12 +279,16 @@ function TicketsPage() {
           {total} ticket{total === 1 ? '' : 's'}
           {filtersActive ? ' match your filters' : ''}
         </p>
-        <TicketTable
-          tickets={items}
-          listSearch={location.search}
-          sortState={listState}
-          onSort={update}
-        />
+        {isWide ? (
+          <TicketTable
+            tickets={items}
+            listSearch={location.search}
+            sortState={listState}
+            onSort={update}
+          />
+        ) : (
+          <TicketCards tickets={items} listSearch={location.search} sortState={listState} />
+        )}
         <Pagination page={page} totalPages={totalPages} onChange={goToPage} />
       </>
     );
@@ -262,7 +312,7 @@ function TicketsPage() {
       <TicketFilters
         state={listState}
         role={role}
-        isStaff={isStaff}
+        showSort={isStaff || !isWide}
         active={filtersActive}
         onChange={update}
         onSearch={search}
