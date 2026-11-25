@@ -33,6 +33,11 @@ A `PATCH /users/{id}` that changes both role and active state writes two entries
 the value a user already has writes none. If the last-admin safeguard undoes a change
 (`409 LAST_ADMIN`), nothing is recorded.
 
+A login refused by the rate limit (`429 RATE_LIMITED`, CD-24) is never recorded: the
+request stops before the route runs. This caps how fast one client can add
+`auth.login_failed` entries (10 per 15 minutes by default). Retention is still open (ticket
+T8 in [`security-review.md`](security-review.md)).
+
 A failed login does not record why it failed. The API gives the same answer for a wrong
 password, an unknown email and a deactivated account, and the log keeps it that way.
 Repeated failures for one email are still easy to spot with the `auth.login_failed` filter.
