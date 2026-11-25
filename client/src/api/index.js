@@ -34,10 +34,18 @@ export function createTicket({ title, description, category, priority }) {
   return api.post('/api/v1/tickets', { title, description, category, priority });
 }
 
-// Returns { items, page, limit, total, totalPages }, newest first. Customers get their own
-// tickets; agents and admins get all.
-export function getTickets({ page = 1, limit = 10, signal } = {}) {
+const TICKET_LIST_PARAMS = ['status', 'priority', 'category', 'assignee', 'q', 'sort', 'order'];
+
+// Returns { items, page, limit, total, totalPages }. Customers get their own tickets;
+// agents and admins get all. Optional filters (docs/ticket-list.md): status, priority,
+// category, assignee (staff only), q (title search), sort and order; empty values are not
+// sent. Pass `signal` so a newer request can abort this one.
+export function getTickets({ page = 1, limit = 10, signal, ...filters } = {}) {
   const query = new URLSearchParams({ page: String(page), limit: String(limit) });
+  for (const key of TICKET_LIST_PARAMS) {
+    const value = filters[key];
+    if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+  }
   return api.get(`/api/v1/tickets?${query}`, { signal });
 }
 

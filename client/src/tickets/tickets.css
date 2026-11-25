@@ -83,6 +83,67 @@
   color: var(--color-olive);
 }
 
+/* Filter toolbar above the list (wireframe 02): a wide search box, then the selects. */
+.ticket-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-end;
+  margin-bottom: var(--space-5);
+}
+
+.ticket-filters-search {
+  flex: 1 1 280px;
+}
+
+.ticket-filters-select {
+  flex: 0 1 auto;
+  min-width: 120px;
+}
+
+.ticket-filters-clear {
+  display: flex;
+  align-items: flex-end;
+}
+
+.ticket-filters input[type='search'] {
+  width: 100%;
+}
+
+.ticket-count {
+  margin: 0 0 var(--space-3);
+  font-size: 0.875rem;
+}
+
+/* Sortable column headers are buttons that look like header text. */
+.sort-button {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: var(--size-touch-target);
+  margin: calc(-1 * var(--space-3)) 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-olive);
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+.sort-button:hover {
+  text-decoration: underline;
+}
+
+.sort-button:focus-visible {
+  outline: 3px solid var(--color-olive);
+  outline-offset: 2px;
+}
+
+.sort-indicator {
+  font-size: 0.75rem;
+}
+
 .ticket-table-wrapper {
   overflow-x: auto;
   border: 1px solid var(--color-sage);

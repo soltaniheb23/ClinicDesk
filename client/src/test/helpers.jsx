@@ -72,7 +72,11 @@ export function requestsTo(fetchMock, route) {
 
 function LocationProbe() {
   const location = useLocation();
-  return <div data-testid="location">{location.pathname}</div>;
+  return (
+    <div data-testid="location" data-search={location.search}>
+      {location.pathname}
+    </div>
+  );
 }
 
 // Renders the real routes at `entry` (a path or { pathname, state }).
