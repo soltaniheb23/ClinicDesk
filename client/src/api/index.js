@@ -79,3 +79,30 @@ export function getComments(ticketId, { signal } = {}) {
 export function addComment(ticketId, { body, internal = false }) {
   return api.post(`/api/v1/tickets/${encodeURIComponent(ticketId)}/comments`, { body, internal });
 }
+
+// Admin user management (docs/user-management.md). All three are admin only.
+
+const USER_LIST_PARAMS = ['role', 'isActive', 'q'];
+
+// Returns { items, page, limit, total, totalPages }; items are { id, name, email, role,
+// isActive, createdAt }, sorted by name. Optional filters: role, isActive (true or false)
+// and q (name or email); empty values are not sent.
+export function getUsers({ page = 1, limit = 10, signal, ...filters } = {}) {
+  const query = new URLSearchParams({ page: String(page), limit: String(limit) });
+  for (const key of USER_LIST_PARAMS) {
+    const value = filters[key];
+    if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+  }
+  return api.get(`/api/v1/users?${query}`, { signal });
+}
+
+// Returns { user }. A 409 EMAIL_TAKEN ApiError when the email is already used.
+export function createUser({ name, email, password, role }) {
+  return api.post('/api/v1/users', { name, email, password, role });
+}
+
+// Returns { user }. `changes` holds role and/or isActive. 409 CANNOT_CHANGE_SELF or
+// LAST_ADMIN when a safeguard refuses the change.
+export function updateUser(id, changes) {
+  return api.patch(`/api/v1/users/${encodeURIComponent(id)}`, changes);
+}

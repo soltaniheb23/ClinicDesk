@@ -1,10 +1,11 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import './AppLayout.css';
 
 const ROLE_LABELS = { customer: 'Customer', agent: 'Agent', admin: 'Admin' };
 
-// Layout for logged-in pages: top bar with the app name, the user and a Log out button.
+// Layout for logged-in pages: top bar with the app name, the admin's "Users" link, the user
+// and a Log out button.
 function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -20,6 +21,13 @@ function AppLayout() {
         <Link className="app-name" to="/tickets">
           ClinicDesk
         </Link>
+        {user?.role === 'admin' && (
+          <nav className="app-nav" aria-label="Admin">
+            <NavLink className="app-nav-link" to="/admin/users">
+              Users
+            </NavLink>
+          </nav>
+        )}
         <div className="app-user">
           {user && (
             <p className="app-user-info">

@@ -1,7 +1,8 @@
 # Roles and permissions
 
 ClinicDesk has three roles. New accounts from `/auth/register` are always
-`customer`; only an admin can change a role (planned `PATCH /users/{id}`).
+`customer`; only an admin can create accounts with another role or change a role
+(`POST /users`, `PATCH /users/{id}`, see [user management](user-management.md)).
 
 ## How it is enforced
 
@@ -21,8 +22,8 @@ deactivated-user tokens and other customers' tickets) in
 
 ## What each role may do
 
-The ticket, comment, attachment, user and admin endpoints are planned; this table is the
-target behaviour for them.
+Attachments, the audit log and the metrics dashboard are still planned; their rows are the
+target behaviour. Every other row is implemented and tested.
 
 | Action | Customer | Agent | Admin |
 |---|---|---|---|
@@ -36,6 +37,6 @@ target behaviour for them.
 | Upload and download attachments | Own tickets | All | All |
 | Change ticket status ([workflow](status-workflow.md)) | Close own resolved ticket | Yes | Yes |
 | Assign or claim a ticket ([assignment](assignment.md)) | No | Claim, or release own | Any active agent or admin |
-| Manage users (create, change role, deactivate) | No | No | Yes |
+| Manage users: list, create, change role, deactivate ([user management](user-management.md)) | No (403) | No (403) | Yes, except their own account |
 | View audit log | No | No | Yes |
 | View metrics dashboard | No | No | Yes |

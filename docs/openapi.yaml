@@ -807,19 +807,57 @@ paths:
   /users:
     get:
       tags: [Users]
-      summary: List users (admin)
+      summary: List users with filters, search and pagination (admin)
+      description: >
+        Admin only. Sorted by name (case-insensitive), then `_id`, so pages are stable.
+        All parameters are optional; an unknown parameter, a repeated parameter, or an
+        operator form such as `role[$ne]=admin` is a 400. A page past the end returns an
+        empty `items` array. Never returns `passwordHash`. Order of checks: 401 -> 403 ->
+        400. See docs/user-management.md.
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+        - { name: role, in: query, schema: { $ref: '#/components/schemas/Role' } }
+        - name: isActive
+          in: query
+          schema: { type: string, enum: ['true', 'false'] }
+        - name: q
+          in: query
+          description: >
+            Name or email search, 1 to 100 characters after trimming. Case-insensitive
+            "contains" match; the text is matched literally (regex characters have no
+            meaning).
+          schema: { type: string, minLength: 1, maxLength: 100, example: berg }
       responses:
         '200':
-          description: Users
+          description: One page of users
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/User' }
+              schema: { $ref: '#/components/schemas/UserPage' }
+              example:
+                items:
+                  - id: 6650c3a1b2c3d4e5f6a7b8c9
+                    name: Lena Berg
+                    email: lena@example.com
+                    role: agent
+                    isActive: true
+                    createdAt: '2026-11-02T09:00:00.000Z'
+                page: 1
+                limit: 10
+                total: 1
+                totalPages: 1
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [Users]
-      summary: Create a user (admin)
+      summary: Create a user with any role (admin)
+      description: >
+        Admin only. Same name, email and password rules as /auth/register, plus a
+        required role. The account is active at once; `isActive` and other unknown
+        fields are ignored. No token is returned and nothing is emailed: the admin gives
+        the temporary password to the person directly. Order of checks: 401 -> 403 ->
+        400 -> 409.
       requestBody:
         required: true
         content:
@@ -828,21 +866,45 @@ paths:
               type: object
               required: [name, email, password, role]
               properties:
-                name: { type: string }
-                email: { type: string, format: email }
-                password: { type: string, minLength: 10 }
+                name: { type: string, minLength: 1, maxLength: 80 }
+                email: { type: string, format: email, maxLength: 254 }
+                password: { type: string, minLength: 8, description: At most 72 bytes (bcrypt limit) }
                 role: { $ref: '#/components/schemas/Role' }
+            example:
+              name: Lena Berg
+              email: lena@example.com
+              password: a-temporary-password
+              role: agent
       responses:
         '201':
           description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user: { $ref: '#/components/schemas/AdminUser' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
-          description: Email already used
+          description: EMAIL_TAKEN. An account with this email already exists (any letter case).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: EMAIL_TAKEN, message: An account with this email already exists }
 
   /users/{id}:
     patch:
       tags: [Users]
-      summary: Change role or deactivate a user (admin)
+      summary: Change a user's role and/or deactivate or reactivate them (admin)
+      description: >
+        Admin only. Send `role`, `isActive` or both. The change applies to the user's
+        existing tokens on their next request (the role and active state are read from
+        the database every time); a deactivated user gets 401 at once and cannot log in.
+        Order of checks: 401 -> 403 -> 400 -> 404 -> 409. See docs/user-management.md.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -851,18 +913,58 @@ paths:
           application/json:
             schema:
               type: object
+              minProperties: 1
               properties:
                 role: { $ref: '#/components/schemas/Role' }
                 isActive: { type: boolean }
-            example: { isActive: false }
+            examples:
+              deactivate: { value: { isActive: false } }
+              promote: { value: { role: agent } }
       responses:
         '200':
           description: Updated user
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/User' }
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user: { $ref: '#/components/schemas/AdminUser' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
+        '404':
+          description: NOT_FOUND. The id is not a valid id, or no such user exists.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: NOT_FOUND, message: User not found }
+        '409':
+          description: >
+            A safeguard refused the change. `CANNOT_CHANGE_SELF`: admins cannot change
+            their own role or active state. `LAST_ADMIN`: the last active admin can never
+            be demoted or deactivated. `USER_CONFLICT`: the user's role or active state
+            changed while the request ran; reload and try again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                self:
+                  value:
+                    error:
+                      code: CANNOT_CHANGE_SELF
+                      message: You cannot change your own role or deactivate your own account
+                lastAdmin:
+                  value:
+                    error:
+                      code: LAST_ADMIN
+                      message: The last active admin cannot be demoted or deactivated
+                conflict:
+                  value:
+                    error:
+                      code: USER_CONFLICT
+                      message: The user was changed by someone else. Reload the list and try again.
 
   /audit-logs:
     get:
@@ -986,6 +1088,28 @@ components:
         isActive: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    AdminUser:
+      type: object
+      description: A user as returned by the admin /users routes. Never includes passwordHash.
+      required: [id, name, email, role, isActive, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/Role' }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    UserPage:
+      type: object
+      required: [items, page, limit, total, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminUser' }
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
     UserRef:
       type: object
       description: A user as shown inside a ticket. Never includes email or passwordHash.

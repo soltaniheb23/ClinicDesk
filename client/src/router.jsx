@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import TicketsPage from './pages/TicketsPage.jsx';
+import UsersPage from './pages/UsersPage.jsx';
 
 function AppRoutes() {
   return (
@@ -26,6 +27,14 @@ function AppRoutes() {
         <Route path="/tickets" element={<TicketsPage />} />
         <Route path="/tickets/new" element={<CreateTicketPage />} />
         <Route path="/tickets/:id" element={<TicketDetailPage />} />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute roles={['admin']}>
+              <UsersPage />
+            </ProtectedRoute>
+          }
+        />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
