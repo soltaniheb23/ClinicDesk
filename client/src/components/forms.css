@@ -1,12 +1,12 @@
 /* Login/register card and form fields. Colors, fonts and spacing come from tokens.css. */
 .auth-page {
   background: var(--color-cream);
-  padding: var(--space-5);
+  padding: var(--space-4);
 }
 
 .auth-card {
-  width: min(100%, 486px);
-  padding: var(--space-6);
+  width: min(100%, 30rem);
+  padding: var(--space-5);
   border: 1px solid var(--color-sage);
   border-radius: var(--radius-md);
   background: var(--color-paper);
@@ -19,9 +19,10 @@
   margin: 0;
   font-family: var(--font-heading);
   font-weight: var(--font-weight-heading);
-  font-size: 2.25rem;
+  font-size: clamp(1.75rem, 1.4rem + 1.5vw, 2.25rem);
   letter-spacing: normal;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .auth-subtitle {
@@ -51,7 +52,10 @@
   font-size: 0.875rem;
 }
 
+/* Full width, and at least 16px text so iOS does not zoom in on focus. */
 .field-input {
+  width: 100%;
+  min-width: 0;
   min-height: var(--size-touch-target);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-green);
@@ -59,6 +63,7 @@
   background: var(--color-paper);
   color: var(--color-olive);
   font: inherit;
+  font-size: max(1rem, 16px);
 }
 
 .field-input[aria-invalid='true'] {
@@ -111,6 +116,19 @@
 }
 
 .auth-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--size-touch-target);
   color: var(--color-olive);
   font-weight: var(--font-weight-bold);
+}
+
+@media (min-width: 40em) {
+  .auth-page {
+    padding: var(--space-5);
+  }
+
+  .auth-card {
+    padding: var(--space-6);
+  }
 }

@@ -47,6 +47,12 @@
   --radius-md: 12px;
   --size-touch-target: 44px; /* WCAG 2.5.5 minimum target height */
 
+  /* Breakpoints (mobile first, min-width only). Custom properties cannot be used inside
+     @media, so stylesheets write the values directly; src/layout/breakpoints.js holds the
+     same values for JavaScript and its test rejects any other value in a stylesheet.
+       tablet:  40em (640px at default text size)
+       desktop: 64em (1024px) */
+
   /* Typography */
   --font-heading: 'Fraunces', Georgia, 'Times New Roman', serif;
   --font-body: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;

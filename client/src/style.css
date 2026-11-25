@@ -17,8 +17,9 @@
   box-sizing: border-box;
 }
 
+/* No min-width: at 200% zoom a phone is narrower than 320px, and a min-width would force
+   the whole page to scroll sideways. */
 body {
-  min-width: 320px;
   min-height: 100vh;
   margin: 0;
 }
@@ -54,6 +55,7 @@ h1 {
   font-size: clamp(2.5rem, 7vw, 4.5rem);
   letter-spacing: -0.06em;
   line-height: 1.02;
+  overflow-wrap: anywhere;
 }
 
 .description {

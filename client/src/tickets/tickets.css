@@ -13,7 +13,7 @@
 }
 
 .ticket-form {
-  max-width: 640px;
+  max-width: 40rem;
 }
 
 .ticket-form textarea.field-input {
@@ -23,14 +23,20 @@
 
 .field-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   gap: var(--space-4);
 }
 
+/* Phones: the buttons share the row (or stack) at full width; wider: natural width. */
 .form-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-4);
+}
+
+.form-actions > * {
+  flex: 1 1 8rem;
+  justify-content: center;
 }
 
 .button-link {
@@ -83,31 +89,52 @@
   color: var(--color-olive);
 }
 
-/* Filter toolbar above the list (wireframe 02): a wide search box, then the selects. */
+/* Filter toolbar above the list (wireframe 02). Phones: one column. Tablets: two columns
+   under a full-width search. Desktop: one row. "Clear filters" is always a visible item. */
 .ticket-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3) var(--space-4);
+  align-items: end;
   margin-bottom: var(--space-5);
 }
 
+.ticket-filters-select,
 .ticket-filters-search {
-  flex: 1 1 280px;
+  min-width: 0;
 }
 
-.ticket-filters-select {
-  flex: 0 1 auto;
-  min-width: 120px;
-}
-
-.ticket-filters-clear {
-  display: flex;
-  align-items: flex-end;
-}
-
-.ticket-filters input[type='search'] {
+.ticket-filters-clear .button-secondary {
+  justify-content: center;
   width: 100%;
+}
+
+@media (min-width: 40em) {
+  .ticket-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ticket-filters-search {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 64em) {
+  .ticket-filters {
+    display: flex;
+  }
+
+  .ticket-filters-search {
+    flex: 2 1 0;
+  }
+
+  .ticket-filters-select {
+    flex: 1 1 0;
+  }
+
+  .ticket-filters-clear {
+    flex: 0 0 auto;
+  }
 }
 
 .ticket-count {
@@ -158,10 +185,17 @@
 
 .ticket-table th,
 .ticket-table td {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3);
   border-bottom: 1px solid var(--color-sage);
   text-align: left;
   vertical-align: top;
+}
+
+@media (min-width: 64em) {
+  .ticket-table th,
+  .ticket-table td {
+    padding: var(--space-3) var(--space-4);
+  }
 }
 
 .ticket-table tbody tr:last-child td {
@@ -177,6 +211,67 @@
 .ticket-title-link {
   color: var(--color-olive);
   font-weight: var(--font-weight-medium);
+  /* break-word, not anywhere: inside the table, "anywhere" would let the browser shrink the
+     title column to a few letters. Long unbroken words still wrap. */
+  overflow-wrap: break-word;
+}
+
+/* Phones: one card per ticket instead of the table (TicketCards in TicketsPage.jsx). */
+.ticket-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ticket-card {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--color-sage);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+}
+
+.ticket-card-title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.ticket-card-title .ticket-title-link {
+  overflow-wrap: anywhere;
+  display: flex;
+  align-items: center;
+  min-height: var(--size-touch-target);
+}
+
+.ticket-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.ticket-card-meta div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.ticket-card-meta dt:not(.visually-hidden)::after {
+  content: ':';
+}
+
+.ticket-card-meta dt:not(.visually-hidden) {
+  font-weight: var(--font-weight-bold);
+}
+
+.ticket-card-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .ticket-title-link:focus-visible,
@@ -185,17 +280,33 @@
   outline-offset: 2px;
 }
 
+/* Phones: Previous and Next share the row around the page number, and wrap onto their own
+   rows when large text does not fit. */
 .pagination {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-4);
+  gap: var(--space-3);
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   margin-top: var(--space-5);
+  text-align: center;
 }
 
 .pagination .button-secondary {
+  flex: 1 1 6rem;
+  justify-content: center;
   cursor: pointer;
+}
+
+@media (min-width: 40em) {
+  .pagination {
+    gap: var(--space-4);
+    justify-content: flex-end;
+  }
+
+  .pagination .button-secondary {
+    flex: 0 0 auto;
+  }
 }
 
 .pagination .button-secondary:disabled {
@@ -206,8 +317,10 @@
 
 /* Ticket detail (wireframe 03). */
 .back-link {
-  display: inline-block;
-  margin-bottom: var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--size-touch-target);
+  margin-bottom: var(--space-2);
   color: var(--color-olive);
   font-weight: var(--font-weight-bold);
 }
@@ -230,9 +343,10 @@
   gap: var(--space-3);
 }
 
+/* Phones: one fact per line; wider: side by side. */
 .ticket-meta {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--space-2) var(--space-5);
   margin: var(--space-3) 0 var(--space-5);
   font-size: 0.9rem;
@@ -240,7 +354,16 @@
 
 .ticket-meta div {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-1);
+  min-width: 0;
+}
+
+@media (min-width: 40em) {
+  .ticket-meta {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
 }
 
 .ticket-meta dt::after {
@@ -249,11 +372,12 @@
 
 .ticket-meta dd {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .ticket-description {
-  max-width: 830px;
-  padding: var(--space-4) var(--space-5);
+  max-width: 52rem;
+  padding: var(--space-4);
   border: 1px solid var(--color-sage);
   border-radius: var(--radius-md);
   background: var(--color-paper);
@@ -339,7 +463,7 @@
   flex-wrap: wrap;
   gap: var(--space-3) var(--space-4);
   align-items: flex-end;
-  max-width: 640px;
+  max-width: 40rem;
   margin: var(--space-4) 0;
   padding: var(--space-4);
   border: 1px solid var(--color-sage);
@@ -349,11 +473,16 @@
 
 .status-panel .field,
 .assign-panel .field {
-  flex: 1 1 200px;
+  flex: 1 1 12rem;
 }
 
+/* Phones: buttons fill the row they wrap onto; wider: natural width. */
 .status-panel .button-primary,
-.assign-panel .button-primary {
+.assign-panel .button-primary,
+.status-panel .button-secondary,
+.assign-panel .button-secondary {
+  flex: 1 1 auto;
+  justify-content: center;
   width: auto;
   padding: var(--space-2) var(--space-5);
 }
@@ -369,7 +498,7 @@
 }
 
 .assignment {
-  max-width: 640px;
+  max-width: 40rem;
   margin: var(--space-4) 0;
 }
 
@@ -390,7 +519,7 @@
 
 /* Comment thread (wireframe 03). */
 .comments {
-  max-width: 830px;
+  max-width: 52rem;
   margin-top: var(--space-6);
 }
 
@@ -432,6 +561,7 @@
 
 .comment-author {
   font-weight: var(--font-weight-bold);
+  overflow-wrap: anywhere;
 }
 
 .comment-role,
@@ -497,7 +627,25 @@
 }
 
 .comment-form .button-primary {
-  align-self: flex-start;
+  align-self: stretch;
   width: auto;
   padding: var(--space-2) var(--space-5);
+}
+
+@media (min-width: 40em) {
+  .ticket-description {
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .form-actions > *,
+  .status-panel .button-primary,
+  .assign-panel .button-primary,
+  .status-panel .button-secondary,
+  .assign-panel .button-secondary {
+    flex: 0 0 auto;
+  }
+
+  .comment-form .button-primary {
+    align-self: flex-start;
+  }
 }
