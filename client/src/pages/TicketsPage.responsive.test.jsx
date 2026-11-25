@@ -1,8 +1,7 @@
 // Ticket list below the tablet breakpoint (CD-36): cards instead of the table.
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MEDIA } from '../layout/breakpoints.js';
-import { jsonResponse, renderApp, storeSession } from '../test/helpers.jsx';
+import { jsonResponse, renderApp, storeSession, stubViewport } from '../test/helpers.jsx';
 
 const TICKETS = [
   {
@@ -44,42 +43,6 @@ function lastListQuery(fetchMock) {
     .map(([url]) => new URL(url, 'http://localhost'))
     .filter((url) => url.pathname === '/api/v1/tickets');
   return Object.fromEntries(urls[urls.length - 1].searchParams);
-}
-
-// A controllable matchMedia: `setWidth` answers the min-width queries from breakpoints.js
-// and notifies listeners, like a browser does on resize or zoom.
-function stubViewport(initialWidth) {
-  let width = initialWidth;
-  const lists = new Map();
-  const minWidthPx = { [MEDIA.tablet]: 640, [MEDIA.desktop]: 1024 };
-
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn((query) => {
-      if (!lists.has(query)) {
-        const listeners = new Set();
-        lists.set(query, {
-          listeners,
-          list: {
-            get matches() {
-              return width >= minWidthPx[query];
-            },
-            media: query,
-            addEventListener: (_type, listener) => listeners.add(listener),
-            removeEventListener: (_type, listener) => listeners.delete(listener),
-          },
-        });
-      }
-      return lists.get(query).list;
-    }),
-  );
-
-  return {
-    setWidth(next) {
-      width = next;
-      for (const { listeners } of lists.values()) listeners.forEach((listener) => listener());
-    },
-  };
 }
 
 function login(role) {

@@ -3,6 +3,7 @@ import { render } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { vi } from 'vitest';
 import { AuthProvider } from '../auth/AuthContext.jsx';
+import { MEDIA } from '../layout/breakpoints.js';
 import AppRoutes from '../router.jsx';
 
 export const STORAGE_KEY = 'clinicdesk.auth';
@@ -68,6 +69,42 @@ export function requestsTo(fetchMock, route) {
       init,
       body: init.body === undefined ? undefined : JSON.parse(init.body),
     }));
+}
+
+// A controllable matchMedia: `setWidth` answers the min-width queries from breakpoints.js
+// and notifies listeners, like a browser does on resize or zoom.
+export function stubViewport(initialWidth) {
+  let width = initialWidth;
+  const lists = new Map();
+  const minWidthPx = { [MEDIA.tablet]: 640, [MEDIA.desktop]: 1024 };
+
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query) => {
+      if (!lists.has(query)) {
+        const listeners = new Set();
+        lists.set(query, {
+          listeners,
+          list: {
+            get matches() {
+              return width >= minWidthPx[query];
+            },
+            media: query,
+            addEventListener: (_type, listener) => listeners.add(listener),
+            removeEventListener: (_type, listener) => listeners.delete(listener),
+          },
+        });
+      }
+      return lists.get(query).list;
+    }),
+  );
+
+  return {
+    setWidth(next) {
+      width = next;
+      for (const { listeners } of lists.values()) listeners.forEach((listener) => listener());
+    },
+  };
 }
 
 function LocationProbe() {

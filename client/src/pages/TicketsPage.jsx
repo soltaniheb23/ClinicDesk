@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import Loading from '../components/Loading.jsx';
+import Pagination from '../components/Pagination.jsx';
 import { MEDIA } from '../layout/breakpoints.js';
 import { useMediaQuery } from '../layout/useMediaQuery.js';
 import '../components/forms.css';
@@ -139,32 +140,6 @@ function TicketCards({ tickets, listSearch, sortState }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-function Pagination({ page, totalPages, onChange }) {
-  return (
-    <nav className="pagination" aria-label="Pagination">
-      <button
-        type="button"
-        className="button-secondary"
-        disabled={page <= 1}
-        onClick={() => onChange(page - 1)}
-      >
-        Previous
-      </button>
-      <span aria-live="polite">
-        Page {page} of {totalPages}
-      </span>
-      <button
-        type="button"
-        className="button-secondary"
-        disabled={page >= totalPages}
-        onClick={() => onChange(page + 1)}
-      >
-        Next
-      </button>
-    </nav>
   );
 }
 
