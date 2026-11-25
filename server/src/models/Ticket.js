@@ -30,9 +30,17 @@ const ticketSchema = new mongoose.Schema(
   },
 );
 
-// "My tickets" (createdBy, newest first) and the upcoming full list sorted by date.
+// "My tickets" (createdBy, newest first) and the full list sorted by date.
 ticketSchema.index({ createdBy: 1, createdAt: -1 });
 ticketSchema.index({ createdAt: -1 });
+// The most common list filters (CD-17, docs/ticket-list.md): the queue by status ("open")
+// and "my tickets" / "unassigned" for agents, newest first. The equality field comes first
+// and the sort fields follow, with _id as the tie-breaker the list always sorts by, so
+// MongoDB can read one page straight from the index without sorting in memory.
+// The title search is a case-insensitive regex and scans the matched tickets; that is fine
+// at ClinicDesk's size (one clinic, thousands of tickets), and a text index can follow later.
+ticketSchema.index({ status: 1, createdAt: -1, _id: -1 });
+ticketSchema.index({ assignee: 1, createdAt: -1, _id: -1 });
 
 module.exports = mongoose.model('Ticket', ticketSchema);
 module.exports.CATEGORIES = CATEGORIES;
