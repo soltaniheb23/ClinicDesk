@@ -107,6 +107,7 @@ The client and server are deployed separately. Set these environment variables i
 - Ticket assignment: [`docs/assignment.md`](docs/assignment.md)
 - Comments and internal notes: [`docs/comments.md`](docs/comments.md)
 - Ticket list filters, search and sorting: [`docs/ticket-list.md`](docs/ticket-list.md)
+- Admin user management and the first admin: [`docs/user-management.md`](docs/user-management.md)
 - Responsive layout and screenshots: [`docs/responsive/`](docs/responsive/README.md)
 
 To view the API contract as interactive documentation, paste `docs/openapi.yaml` into [Swagger Editor](https://editor.swagger.io).
@@ -143,6 +144,12 @@ the client. The API deployment is described by [`render.yaml`](render.yaml).
 5. Open `/register` on the Vercel deployment, create an account, and check that
 	you land on `/tickets` with your name and role in the header. Log out, then log
 	back in at `/login`.
+6. Create the first admin, once per environment: register the account that should
+	become the admin, then set its `role` to `"admin"` in Atlas (**Browse Collections**,
+	`users` collection). Log out and back in. This is the only manual role change. All
+	other agents, admins and role changes are handled in the app at `/admin/users`
+	(**Users** in the top bar). There are no default credentials. See
+	[`docs/user-management.md`](docs/user-management.md#creating-the-first-admin).
 
 The Atlas connection string is staged for future database integration; the
 current application does not yet connect to MongoDB. Configure secrets only in

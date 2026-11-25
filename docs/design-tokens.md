@@ -102,7 +102,9 @@ CSS custom properties cannot be used inside `@media`, so stylesheets write `40em
 `64em` directly. `client/src/layout/breakpoints.test.js` fails if a stylesheet uses any
 other media query (except `prefers-reduced-motion`). JavaScript reads the same values
 through `MEDIA` and the `useMediaQuery` hook (the ticket list switches between cards and
-the table with it, so only one of them is in the page for screen readers).
+the table with it, so only one of them is in the page for screen readers). The admin user
+list switches at `desktop` instead of `tablet`, because every row carries a role select
+and a deactivate button.
 
 The breakpoints are in `em`, not `px`. Media queries measure `em` against the browser's
 default text size, so a user with larger text, or at 200% zoom, gets the tablet or phone
