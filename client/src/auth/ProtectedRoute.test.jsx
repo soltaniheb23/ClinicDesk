@@ -30,6 +30,14 @@ function renderAt(path) {
             }
           />
           <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <p>Admin users</p>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/settings"
             element={
               <ProtectedRoute>
@@ -78,5 +86,45 @@ describe('ProtectedRoute', () => {
 
     expect(screen.getByText('Settings page')).toBeTruthy();
     expect(JSON.parse(window.sessionStorage.getItem('clinicdesk.auth')).token).toBe('test-token');
+  });
+
+  describe('with roles', () => {
+    function storeRole(role) {
+      window.sessionStorage.setItem(
+        'clinicdesk.auth',
+        JSON.stringify({ token: 'stored-token', user: { id: 'u1', name: 'Mara', role } }),
+      );
+    }
+
+    it('renders the child for a listed role', () => {
+      storeRole('admin');
+      renderAt('/admin/users');
+
+      expect(screen.getByText('Admin users')).toBeTruthy();
+    });
+
+    it.each(['customer', 'agent'])('sends a %s to /tickets', (role) => {
+      storeRole(role);
+      renderAt('/admin/users');
+
+      expect(screen.getByText('Ticket list')).toBeTruthy();
+      expect(screen.queryByText('Admin users')).toBeNull();
+    });
+
+    it('sends a session without a user to /tickets', () => {
+      window.sessionStorage.setItem(
+        'clinicdesk.auth',
+        JSON.stringify({ token: 'stored-token', user: null }),
+      );
+      renderAt('/admin/users');
+
+      expect(screen.getByText('Ticket list')).toBeTruthy();
+    });
+
+    it('still sends a logged-out visitor to /login first', () => {
+      renderAt('/admin/users');
+
+      expect(screen.getByRole('form', { name: 'Log in' })).toBeTruthy();
+    });
   });
 });
