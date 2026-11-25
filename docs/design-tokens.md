@@ -84,3 +84,45 @@ WCAG AA needs 4.5:1 for body text and 3:1 for large text and UI components.
 | White on green | 5.05 | OK for button labels |
 | Green on cream | 4.18 | Large text, borders and icons only, not body text |
 | Sage on cream | 2.13 | Decorative only, never text |
+
+## Breakpoints and responsive rules
+
+The CSS is mobile first: the base rules are the phone layout, and `min-width` media
+queries add the tablet and desktop layouts. There are two breakpoints, defined once in
+[`client/src/layout/breakpoints.js`](../client/src/layout/breakpoints.js) and listed in
+`tokens.css`:
+
+| Name | Query | At 16px text | Layout from here |
+|---|---|---|---|
+| (phone) | none | below 640px | One column, ticket cards instead of the table |
+| `tablet` | `@media (min-width: 40em)` | 640px | Ticket table, two-column filter toolbar |
+| `desktop` | `@media (min-width: 64em)` | 1024px | Filter toolbar in one row, wider table cells |
+
+CSS custom properties cannot be used inside `@media`, so stylesheets write `40em` and
+`64em` directly. `client/src/layout/breakpoints.test.js` fails if a stylesheet uses any
+other media query (except `prefers-reduced-motion`). JavaScript reads the same values
+through `MEDIA` and the `useMediaQuery` hook (the ticket list switches between cards and
+the table with it, so only one of them is in the page for screen readers).
+
+The breakpoints are in `em`, not `px`. Media queries measure `em` against the browser's
+default text size, so a user with larger text, or at 200% zoom, gets the tablet or phone
+layout sooner instead of a cramped desktop one.
+
+Rules:
+
+- **No horizontal page scroll** at 360, 768 and 1280px, at 200% zoom and with the largest
+  text size. Only the ticket table may scroll inside its own box as a last resort.
+- **Relative units:** `rem` for maximum widths (`max-width: 40rem`), `%`, `minmax()` and
+  `clamp()` for flexible sizes. No fixed pixel widths and no `min-width` that can force
+  sideways scrolling (the old `body { min-width: 320px }` was removed).
+- **Touch targets:** buttons, inputs and standalone links are at least
+  `--size-touch-target` (44px) tall, with at least `--space-2` (8px) between them.
+  Links inside a sentence are exempt (WCAG 2.5.8).
+- **Inputs:** full width and at least 16px text (`font-size: max(1rem, 16px)`), so iOS
+  Safari does not zoom in on focus.
+- **Long text:** titles, names and comments wrap with `overflow-wrap: anywhere`; comment
+  and description text keeps `white-space: pre-wrap`. Inside the ticket table, titles use
+  `overflow-wrap: break-word`, because `anywhere` would let the table shrink the title
+  column to a few letters.
+
+Screenshots at each width: [`docs/responsive/`](responsive/README.md).

@@ -83,6 +83,9 @@ priority or status ranks the tickets in the query, which is fine at this size.
   selects for status, priority and category. Agents and admins also get an assignee select
   (All, Me, Unassigned) and a "Sort by" select. "Clear filters" appears while a filter or
   search is active; it keeps the sort.
+- Below the tablet breakpoint (640px, CD-36) the table is replaced by one card per
+  ticket, and the "Sort by" select is shown to every role instead of the sortable headers
+  ([responsive rules](design-tokens.md#breakpoints-and-responsive-rules)).
 - The Status, Priority and Created column headers are buttons that sort the list. The
   active column has `aria-sort`; a second click reverses the direction.
 - Page, filters, search and sort live in the URL (`/tickets?status=open&q=printer`), so
