@@ -110,6 +110,25 @@ const ROUTES = [
     body: () => ({ body: 'Note', internal: true }),
   },
   { name: 'GET /users/agents', method: 'get', path: () => '/api/v1/users/agents' },
+  { name: 'GET /users', method: 'get', path: () => '/api/v1/users' },
+  {
+    name: 'POST /users',
+    method: 'post',
+    path: () => '/api/v1/users',
+    body: () => ({
+      name: 'New Agent',
+      email: `new-agent-${new mongoose.Types.ObjectId()}@example.com`,
+      password: 'a-long-password',
+      role: 'agent',
+    }),
+  },
+  {
+    // The target is the customer who owns the ticket (never the caller).
+    name: 'PATCH /users/:id (role)',
+    method: 'patch',
+    path: (_ticketId, owner) => `/api/v1/users/${owner.id}`,
+    body: () => ({ role: 'agent' }),
+  },
 ];
 
 // Expected status per role, with the customer acting on their own ticket.
@@ -125,6 +144,9 @@ const EXPECTED = {
   'POST /tickets/:id/comments (public)': { customer: 201, agent: 201, admin: 201 },
   'POST /tickets/:id/comments (internal)': { customer: 403, agent: 201, admin: 201 },
   'GET /users/agents': { customer: 403, agent: 200, admin: 200 },
+  'GET /users': { customer: 403, agent: 403, admin: 200 },
+  'POST /users': { customer: 403, agent: 403, admin: 201 },
+  'PATCH /users/:id (role)': { customer: 403, agent: 403, admin: 200 },
 };
 
 const ROLES = ['customer', 'agent', 'admin'];
@@ -134,8 +156,9 @@ const matrix = ROUTES.flatMap((route) =>
   ROLES.map((role) => [route.name, role, EXPECTED[route.name][role], route]),
 );
 
-function send(route, ticketId, token, actor) {
-  const pending = request(app)[route.method](route.path(ticketId));
+// `owner` is the customer who owns the ticket; user routes use them as the target user.
+function send(route, ticketId, token, actor, owner) {
+  const pending = request(app)[route.method](route.path(ticketId, owner));
   if (token) pending.set('Authorization', `Bearer ${token}`);
   return route.body ? pending.send(route.body(actor ?? {})) : pending;
 }
@@ -159,7 +182,7 @@ describe.each(matrix)('%s as %s', (_name, role, expected, route) => {
     const actor = role === 'customer' ? owner : await createUser(role);
     const ticket = await customerTicket(owner, route.ticketStatus);
 
-    const response = await send(route, ticket.id, actor.token, actor);
+    const response = await send(route, ticket.id, actor.token, actor, owner);
 
     expect(response.status).toBe(expected);
     if (expected === 403) expect(response.body).toEqual(FORBIDDEN);
@@ -176,9 +199,9 @@ describe.each(ROUTES.map((route) => [route.name, route]))(
     }
 
     it('returns 401 without a token', async () => {
-      const { ticket } = await setup();
+      const { owner, ticket } = await setup();
 
-      const response = await send(route, ticket.id, null);
+      const response = await send(route, ticket.id, null, null, owner);
 
       expect(response.status).toBe(401);
       expect(response.body).toEqual(UNAUTHENTICATED);
@@ -192,17 +215,17 @@ describe.each(ROUTES.map((route) => [route.name, route]))(
         'test-secret',
       );
 
-      const response = await send(route, ticket.id, expired, owner);
+      const response = await send(route, ticket.id, expired, owner, owner);
 
       expect(response.status).toBe(401);
       expect(response.body).toEqual(UNAUTHENTICATED);
     });
 
     it.each(ROLES)('returns 401 for a deactivated %s with a valid token', async (role) => {
-      const { ticket } = await setup();
+      const { owner, ticket } = await setup();
       const actor = await createUser(role, { isActive: false });
 
-      const response = await send(route, ticket.id, actor.token, actor);
+      const response = await send(route, ticket.id, actor.token, actor, owner);
 
       expect(response.status).toBe(401);
       expect(response.body).toEqual(UNAUTHENTICATED);
