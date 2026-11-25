@@ -1,4 +1,5 @@
 const express = require('express');
+const auditLogsRouter = require('./routes/auditLogs');
 const authRouter = require('./routes/auth');
 const ticketsRouter = require('./routes/tickets');
 const usersRouter = require('./routes/users');
@@ -35,6 +36,7 @@ app.get('/api/v1/hello', (_request, response) => {
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/tickets', ticketsRouter);
 app.use('/api/v1/users', usersRouter);
+app.use('/api/v1/audit-logs', auditLogsRouter);
 
 // eslint-disable-next-line no-unused-vars
 app.use((error, _request, response, _next) => {
