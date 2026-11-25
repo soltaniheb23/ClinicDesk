@@ -106,3 +106,16 @@ export function createUser({ name, email, password, role }) {
 export function updateUser(id, changes) {
   return api.patch(`/api/v1/users/${encodeURIComponent(id)}`, changes);
 }
+
+const AUDIT_LOG_PARAMS = ['action', 'actor', 'entityType', 'from', 'to'];
+
+// Returns { items, page, limit, total, totalPages }, newest first (admin only,
+// docs/audit-log.md). `from` and `to` are ISO date-times; empty values are not sent.
+export function getAuditLogs({ page = 1, limit = 20, signal, ...filters } = {}) {
+  const query = new URLSearchParams({ page: String(page), limit: String(limit) });
+  for (const key of AUDIT_LOG_PARAMS) {
+    const value = filters[key];
+    if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+  }
+  return api.get(`/api/v1/audit-logs?${query}`, { signal });
+}
