@@ -182,49 +182,126 @@ paths:
   /tickets:
     get:
       tags: [Tickets]
-      summary: List tickets, newest first (customers see only their own)
+      summary: List tickets with filters, title search, sorting and pagination
       description: >
-        Customers get the tickets they created; agents and admins get all tickets.
-        Sorted by `createdAt` descending with `_id` as tie-breaker. A page past the end
-        returns an empty `items` array. Filters (status, priority, category, assignee,
-        title search) come in CD-17.
+        Customers get only the tickets they created; agents and admins get all tickets.
+        Filters and search only ever narrow that scope, and `total` counts the same
+        filtered set as `items`. All parameters are optional; an unknown parameter, a
+        repeated parameter, or an operator form such as `status[$ne]=closed` is a 400.
+        Several values of one filter are comma-separated (`status=open,in_progress`).
+        Sorting always ends with `_id`, so pages are stable. A page past the end returns
+        an empty `items` array. See docs/ticket-list.md.
       parameters:
         - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+        - name: status
+          in: query
+          description: One status or a comma-separated list.
+          style: form
+          explode: false
+          schema: { type: array, items: { type: string, enum: [open, in_progress, waiting, resolved, closed] } }
+          example: [open, in_progress]
+        - name: priority
+          in: query
+          description: One priority or a comma-separated list.
+          style: form
+          explode: false
+          schema: { type: array, items: { type: string, enum: [low, normal, high, urgent] } }
+          example: [high, urgent]
+        - name: category
+          in: query
+          description: One category or a comma-separated list.
+          style: form
+          explode: false
+          schema: { type: array, items: { type: string, enum: [it, facility, account, other] } }
+          example: [it]
+        - name: assignee
+          in: query
+          description: >
+            Agents and admins only (a customer gets 403). A user id, `me` (the logged-in
+            user) or `unassigned`.
+          schema:
+            oneOf:
+              - { type: string, enum: [me, unassigned] }
+              - { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+          example: me
+        - name: q
+          in: query
+          description: >
+            Title search, 1 to 100 characters after trimming. Case-insensitive "contains"
+            match; the text is matched literally (regex characters have no meaning).
+          schema: { type: string, minLength: 1, maxLength: 100, example: printer }
+        - name: sort
+          in: query
+          description: >
+            `priority` sorts by meaning (low < normal < high < urgent) and `status` by
+            workflow order (open < in_progress < waiting < resolved < closed); within the
+            same value the newest ticket comes first. `_id` is always the last key.
+          schema: { type: string, enum: [createdAt, updatedAt, priority, status], default: createdAt }
+        - { name: order, in: query, schema: { type: string, enum: [asc, desc], default: desc } }
       responses:
         '200':
           description: One page of tickets
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TicketPage' }
-              example:
-                items:
-                  - id: 6651b2a7c3d4e5f6a7b8c9d1
-                    title: Printer in reception not working
-                    description: It shows error E-12 since this morning.
-                    category: it
-                    priority: high
-                    status: open
-                    createdBy: { id: 6650a1f2c3d4e5f6a7b8c9d0, name: Mara Jensen }
-                    assignee: null
-                    firstResponseAt: null
-                    resolvedAt: null
-                    createdAt: '2026-12-01T09:15:00.000Z'
-                    updatedAt: '2026-12-01T09:15:00.000Z'
-                page: 1
-                limit: 10
-                total: 1
-                totalPages: 1
+              examples:
+                filtered:
+                  summary: GET /tickets?status=open,in_progress&q=printer&sort=priority
+                  value:
+                    items:
+                      - id: 6651b2a7c3d4e5f6a7b8c9d1
+                        title: Printer in reception not working
+                        description: It shows error E-12 since this morning.
+                        category: it
+                        priority: high
+                        status: open
+                        createdBy: { id: 6650a1f2c3d4e5f6a7b8c9d0, name: Mara Jensen }
+                        assignee: null
+                        firstResponseAt: null
+                        resolvedAt: null
+                        createdAt: '2026-12-01T09:15:00.000Z'
+                        updatedAt: '2026-12-01T09:15:00.000Z'
+                    page: 1
+                    limit: 10
+                    total: 1
+                    totalPages: 1
+                noMatch:
+                  summary: Nothing matches the filters
+                  value: { items: [], page: 1, limit: 10, total: 0, totalPages: 0 }
         '400':
-          description: Invalid page or limit (VALIDATION_ERROR)
+          description: >
+            Invalid page, limit, filter value, search, sort or order; an unknown or repeated
+            parameter; or an operator form such as `status[$ne]` (VALIDATION_ERROR). The
+            `field` is the parameter name as sent.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                badValue:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid
+                      details:
+                        - field: status
+                          message: 'Status must be one or more of: open, in_progress, waiting, resolved, closed (comma-separated)'
+                        - field: sort
+                          message: 'Sort must be one of: createdAt, updatedAt, priority, status'
+                operator:
+                  summary: GET /tickets?status[$ne]=closed
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid
+                      details: [ { field: 'status[$ne]', message: Unknown query parameter } ]
+        '403':
+          description: A customer sent `assignee` (FORBIDDEN). Checked after the 400 checks.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
               example:
-                error:
-                  code: VALIDATION_ERROR
-                  message: Some fields are invalid
-                  details: [ { field: limit, message: Limit must be a whole number from 1 to 50 } ]
+                error: { code: FORBIDDEN, message: You do not have permission to do this }
         '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [Tickets]
