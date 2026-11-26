@@ -83,7 +83,7 @@ The status is one of:
 
 ## Rate-limit client key
 
-Added by `fix/CD-24-rate-limit-client-ip`, after the first deployment.
+Added by `feature/CD-24-rate-limit-client-ip`, after the first deployment.
 
 - **Why the key matters.** Each limiter counts per key. A key the client can change gives the
   client a fresh counter per attempt, so brute force is never slowed. A key all clients share

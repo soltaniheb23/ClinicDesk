@@ -5,8 +5,8 @@
 // (for example Redis) would be needed.
 //
 // The client key: by default req.ip, which comes from X-Forwarded-For and the TRUST_PROXY
-// hop count (app.js). Behind Cloudflare plus Render's load balancer that hop count is not
-// stable, so req.ip can be a client-sent X-Forwarded-For entry or a proxy address. With
+// hop count (app.js). Behind Cloudflare plus Render's load balancer no fixed hop count gave
+// an entry the client could not choose (a new X-Forwarded-For meant a new counter). With
 // TRUST_CF_CONNECTING_IP=true the key is Cloudflare's CF-Connecting-IP instead, which
 // Cloudflare sets to the address that connected to it and overwrites if the client sends it.
 const { isIP } = require('node:net');

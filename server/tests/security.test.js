@@ -462,20 +462,35 @@ describe('rate-limit client key (CF-Connecting-IP)', () => {
     expect((await attempt(app, { 'CF-Connecting-IP': '203.0.113.2' })).status).toBe(401);
   });
 
-  it('applies the same key to the register and global limiters', async () => {
+  it('applies the same key to the register limiter', async () => {
     const app = appWith({
-      rateLimit: {
-        enabled: true,
-        trustCfConnectingIp: true,
-        register: { max: 1 },
-        global: { max: 1 },
-      },
+      rateLimit: { enabled: true, trustCfConnectingIp: true, register: { max: 1 } },
     });
-    const hello = (ip) => request(app).get('/api/v1/hello').set('CF-Connecting-IP', ip);
+    const register = (index, ip) =>
+      request(app)
+        .post('/api/v1/auth/register')
+        .set('CF-Connecting-IP', ip)
+        .set('X-Forwarded-For', `198.51.100.${index}`)
+        .send({ name: 'New User', email: `new${index}@example.com`, password: PASSWORD });
 
-    expect((await hello('203.0.113.1')).status).toBe(200);
-    expect((await hello('203.0.113.1')).status).toBe(429);
-    expect((await hello('203.0.113.2')).status).toBe(200);
+    expect((await register(1, '203.0.113.1')).status).toBe(201);
+    expect((await register(2, '203.0.113.1')).status).toBe(429);
+    expect((await register(3, '203.0.113.2')).status).toBe(201);
+  });
+
+  it('applies the same key to the global limiter', async () => {
+    const app = appWith({
+      rateLimit: { enabled: true, trustCfConnectingIp: true, global: { max: 1 } },
+    });
+    const hello = (index, ip) =>
+      request(app)
+        .get('/api/v1/hello')
+        .set('CF-Connecting-IP', ip)
+        .set('X-Forwarded-For', `198.51.100.${index}`);
+
+    expect((await hello(1, '203.0.113.1')).status).toBe(200);
+    expect((await hello(2, '203.0.113.1')).status).toBe(429);
+    expect((await hello(3, '203.0.113.2')).status).toBe(200);
   });
 });
 
