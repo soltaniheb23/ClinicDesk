@@ -18,3 +18,10 @@ services:
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 1h
+      # Render serves the API through Cloudflare: rate limits key on CF-Connecting-IP.
+      # TRUST_PROXY stays unset (1 in production).
+      - key: TRUST_CF_CONNECTING_IP
+        value: "true"
+      # Temporary: "true" logs the client-IP inputs of each failed login.
+      - key: DEBUG_CLIENT_IP
+        value: "false"
