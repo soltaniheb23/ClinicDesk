@@ -49,6 +49,29 @@ function parseTrustProxy(env) {
   return null;
 }
 
+// An on/off setting such as TRUST_CF_CONNECTING_IP or DEBUG_CLIENT_IP. Unset or empty: false.
+// "true" or "false" (surrounding spaces ignored). Anything else is null (a startup error), so
+// a typo such as "ture" or "yes" never silently leaves a security setting off or on.
+function parseBooleanFlag(value) {
+  const trimmed = value?.trim();
+  if (trimmed === undefined || trimmed === '' || trimmed === 'false') return false;
+  if (trimmed === 'true') return true;
+  return null;
+}
+
+// TRUST_CF_CONNECTING_IP: whether the rate limiters key on Cloudflare's CF-Connecting-IP
+// header instead of req.ip (src/security/rateLimit.js). Only safe when every request reaches
+// the API through Cloudflare, which overwrites the header; otherwise a client could set it.
+function parseTrustCfConnectingIp(env) {
+  return parseBooleanFlag(env.TRUST_CF_CONNECTING_IP);
+}
+
+// DEBUG_CLIENT_IP: temporary. Logs the client-IP inputs of each failed login (routes/auth.js)
+// while the Render and Cloudflare setup is being confirmed. Remove once it is.
+function parseDebugClientIp(env) {
+  return parseBooleanFlag(env.DEBUG_CLIENT_IP);
+}
+
 function isPositiveInteger(value) {
   return /^[1-9]\d*$/.test(String(value).trim());
 }
@@ -89,6 +112,16 @@ function getStartupErrors(env) {
     errors.push('TRUST_PROXY must be "false" or a whole number of proxy hops (for example 1).');
   }
 
+  if (parseTrustCfConnectingIp(env) === null) {
+    errors.push(
+      `TRUST_CF_CONNECTING_IP must be "true" or "false" (got "${env.TRUST_CF_CONNECTING_IP}"). Set "true" only when every request reaches the API through Cloudflare.`,
+    );
+  }
+
+  if (parseDebugClientIp(env) === null) {
+    errors.push(`DEBUG_CLIENT_IP must be "true" or "false" (got "${env.DEBUG_CLIENT_IP}").`);
+  }
+
   for (const name of RATE_LIMIT_VARIABLES) {
     if (env[name] !== undefined && env[name] !== '' && !isPositiveInteger(env[name])) {
       errors.push(`${name} must be a whole number greater than 0.`);
@@ -102,6 +135,9 @@ module.exports = {
   JWT_SECRET_MIN_LENGTH,
   RATE_LIMIT_VARIABLES,
   getStartupErrors,
+  parseBooleanFlag,
   parseClientOrigins,
+  parseDebugClientIp,
+  parseTrustCfConnectingIp,
   parseTrustProxy,
 };
