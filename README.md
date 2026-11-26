@@ -159,7 +159,8 @@ and redeploy. Every failed login then logs one line in the Render logs:
 It holds `req.ip`, `req.ips`, the `X-Forwarded-For` and `CF-Connecting-IP` headers and the
 socket address, nothing else (no email, password, token or body). Check that
 `cfConnectingIp` is your own public IP, also when you send a fake `CF-Connecting-IP` with curl.
-Then set `DEBUG_CLIENT_IP=false` again. The log will be removed once the setup is confirmed.
+Then delete `DEBUG_CLIENT_IP` on Render again (unset means `false`); it is not in `render.yaml`.
+The log will be removed once the setup is confirmed.
 
 The client's CSP (`connect-src` in `client/vercel.json`) allows the API at
 `https://clinicdesk-api-2uh0.onrender.com`. When the Render service URL changes,
@@ -206,6 +207,11 @@ the client. The API deployment is described by [`render.yaml`](render.yaml).
 	the Atlas connection string and `CLIENT_ORIGIN` to the final Vercel origin
 	(for example, `https://clinicdesk.vercel.app`). The API health check is
 	`/health`; its hello endpoint is `/api/v1/hello`.
+	`render.yaml` sets `EMAIL_ENABLED=true` and `APP_URL=https://clinic-desk-sable.vercel.app`,
+	so also set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `MAIL_FROM` in the
+	Render dashboard (a Mailtrap sandbox on staging). **Until all of them are set, the API
+	stops at startup** with an error that names the missing variables. To run without email,
+	set `EMAIL_ENABLED=false` instead ([`docs/notifications.md`](docs/notifications.md)).
 3. In Vercel, import the repository with `client` as the Root Directory. Set
 	`VITE_API_URL` to the Render API origin (for example,
 	`https://<your-api>.onrender.com`) for the Preview and Production
