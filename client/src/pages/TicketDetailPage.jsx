@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { getTicket } from '../api/index.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import Loading from '../components/Loading.jsx';
-import { PriorityBadge, StatusBadge } from '../tickets/Badges.jsx';
+import { PriorityBadge, SlaBadge, StatusBadge } from '../tickets/Badges.jsx';
 import { formatDate } from '../tickets/format.js';
 import { CATEGORY_OPTIONS, STATUS_LABELS, labelFor } from '../tickets/options.js';
 import AssignControl from '../tickets/AssignControl.jsx';
@@ -17,6 +18,9 @@ import '../tickets/tickets.css';
 function TicketDetailPage() {
   const { id } = useParams();
   const location = useLocation();
+  const { user } = useAuth();
+  // SLA is staff-only (CD-22); the API sends no sla object to customers either.
+  const isStaff = user?.role === 'agent' || user?.role === 'admin';
   const backTo = `/tickets${location.state?.listSearch ?? ''}`;
   const [reloadCount, setReloadCount] = useState(0);
   const requestKey = `${id}:${reloadCount}`;
@@ -92,6 +96,7 @@ function TicketDetailPage() {
         <div className="ticket-badges">
           <StatusBadge status={ticket.status} />
           <PriorityBadge priority={ticket.priority} />
+          {isStaff && <SlaBadge sla={ticket.sla} />}
         </div>
       </header>
       <StatusControl key={ticket.status} ticket={ticket} onUpdated={handleStatusUpdated} />
