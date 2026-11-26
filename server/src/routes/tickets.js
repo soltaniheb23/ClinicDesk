@@ -142,6 +142,12 @@ router.post('/', async (request, response) => {
   const created = await Ticket.create({ ...parsed.data, createdBy: request.user.id });
   const ticket = await withPublicUsers(Ticket.findById(created._id));
 
+  // After the write, not awaited: the email never delays or changes the response (CD-21).
+  request.app.get('notifier').notifyTicketCreated({
+    ticket: { id: ticket._id.toString(), title: ticket.title, description: ticket.description },
+    author: { id: request.user.id, name: ticket.createdBy?.name },
+  });
+
   return response.status(201).json({ ticket: serializeTicket(ticket) });
 });
 
@@ -391,6 +397,18 @@ router.post('/:id/comments', async (request, response) => {
   const comment = await Comment.findById(created._id)
     .populate('author', COMMENT_AUTHOR_FIELDS)
     .lean();
+
+  // After the write, not awaited (CD-21). Internal notes never send an email.
+  request.app.get('notifier').notifyReply({
+    ticket: {
+      id: ticket._id.toString(),
+      title: ticket.title,
+      createdBy: ticket.createdBy,
+      assignee: ticket.assignee,
+    },
+    comment: { body: comment.body, internal: comment.internal },
+    author: { id: user.id, name: comment.author?.name, role: user.role },
+  });
 
   return response.status(201).json({ comment: serializeComment(comment) });
 });

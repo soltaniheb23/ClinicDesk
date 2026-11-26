@@ -3,6 +3,7 @@ const helmet = require('helmet');
 const {
   parseClientOrigins,
   parseDebugClientIp,
+  parseMailConfig,
   parseTrustCfConnectingIp,
   parseTrustProxy,
 } = require('./config');
@@ -10,6 +11,8 @@ const auditLogsRouter = require('./routes/auditLogs');
 const authRouter = require('./routes/auth');
 const ticketsRouter = require('./routes/tickets');
 const usersRouter = require('./routes/users');
+const { createMailer } = require('./notifications/mailer');
+const { createNotifier } = require('./notifications/notify');
 const { createLimiters } = require('./security/rateLimit');
 
 const NOT_FOUND = { error: { code: 'NOT_FOUND', message: 'Not found' } };
@@ -39,8 +42,15 @@ function corsAllowlist(allowedOrigins) {
 
 // Builds the API. `env` is read once, here. `rateLimit` is passed to createLimiters
 // (src/security/rateLimit.js): tests use it for small limits and fresh counters.
-function createApp({ env = process.env, rateLimit = {} } = {}) {
+// `mailTransport` replaces the SMTP transport (tests inject a fake; docs/notifications.md).
+function createApp({ env = process.env, rateLimit = {}, mailTransport } = {}) {
   const app = express();
+
+  // Email notifications (CD-21). Off unless EMAIL_ENABLED=true; never sent under
+  // NODE_ENV=test without an injected transport. Routes reach it with request.app.get().
+  const mailConfig = parseMailConfig(env);
+  const mailer = createMailer({ config: mailConfig, env, transport: mailTransport });
+  app.set('notifier', createNotifier({ mailer, appUrl: mailConfig.appUrl }));
   const { loginLimiter, registerLimiter, globalLimiter } = createLimiters({
     env,
     trustCfConnectingIp: parseTrustCfConnectingIp(env) === true,
