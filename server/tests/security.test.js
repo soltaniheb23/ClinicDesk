@@ -508,6 +508,65 @@ describe('clientKeyGenerator', () => {
   });
 });
 
+describe('DEBUG_CLIENT_IP (temporary failed-login log)', () => {
+  const EMAIL = 'mara@example.com';
+  const WRONG = 'wrong-password-123';
+  const failedLogin = (app) =>
+    request(app)
+      .post('/api/v1/auth/login')
+      .set('X-Forwarded-For', '198.51.100.1')
+      .set('CF-Connecting-IP', '203.0.113.7')
+      .send({ email: EMAIL, password: WRONG });
+  const debugLines = () =>
+    console.log.mock.calls.filter(([line]) => String(line).startsWith('[debug-client-ip]'));
+
+  beforeEach(async () => {
+    await createUser(EMAIL);
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  it('logs one line per failed login, without the email or password', async () => {
+    const app = appWith({ env: { DEBUG_CLIENT_IP: 'true', TRUST_PROXY: '1' } });
+
+    expect((await failedLogin(app)).status).toBe(401);
+
+    const lines = debugLines();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toHaveLength(1);
+    const details = JSON.parse(lines[0][0].replace('[debug-client-ip] failed login ', ''));
+    expect(details).toEqual({
+      ip: '198.51.100.1',
+      ips: ['198.51.100.1'],
+      xForwardedFor: '198.51.100.1',
+      cfConnectingIp: '203.0.113.7',
+      remoteAddress: expect.any(String),
+    });
+    const logged = JSON.stringify(console.log.mock.calls);
+    expect(logged).not.toContain(EMAIL);
+    expect(logged).not.toContain(WRONG);
+  });
+
+  it('does not log a successful login', async () => {
+    const app = appWith({ env: { DEBUG_CLIENT_IP: 'true' } });
+
+    const response = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: EMAIL, password: PASSWORD });
+
+    expect(response.status).toBe(200);
+    expect(debugLines()).toHaveLength(0);
+  });
+
+  it.each([
+    ['unset', {}],
+    ['"false"', { DEBUG_CLIENT_IP: 'false' }],
+  ])('logs nothing when DEBUG_CLIENT_IP is %s', async (_label, env) => {
+    expect((await failedLogin(appWith({ env }))).status).toBe(401);
+
+    expect(console.log).not.toHaveBeenCalled();
+  });
+});
+
 describe('createLimiters', () => {
   it('is off by default under NODE_ENV=test and on elsewhere', () => {
     const off = createLimiters({ env: { NODE_ENV: 'test' } });

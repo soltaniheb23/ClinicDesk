@@ -1,6 +1,11 @@
 const express = require('express');
 const helmet = require('helmet');
-const { parseClientOrigins, parseTrustCfConnectingIp, parseTrustProxy } = require('./config');
+const {
+  parseClientOrigins,
+  parseDebugClientIp,
+  parseTrustCfConnectingIp,
+  parseTrustProxy,
+} = require('./config');
 const auditLogsRouter = require('./routes/auditLogs');
 const authRouter = require('./routes/auth');
 const ticketsRouter = require('./routes/tickets');
@@ -61,6 +66,9 @@ function createApp({ env = process.env, rateLimit = {} } = {}) {
   app.set('trust proxy', parseTrustProxy(env) ?? false);
   // Behind Cloudflare (Render), the rate limiters key on CF-Connecting-IP instead
   // (TRUST_CF_CONNECTING_IP, src/security/rateLimit.js). req.ip is still the fallback.
+
+  // Temporary (DEBUG_CLIENT_IP): routes/auth.js logs the client-IP inputs of failed logins.
+  app.set('debugClientIp', parseDebugClientIp(env) === true);
 
   app.use(corsAllowlist(new Set(parseClientOrigins(env.CLIENT_ORIGIN))));
 

@@ -16,6 +16,22 @@ const registerSchema = z.object({ name, email, password: newPassword });
 
 const loginSchema = z.object({ email, password: loginPassword });
 
+// TEMPORARY (DEBUG_CLIENT_IP=true, see README "Security"): one line per failed login with
+// what the rate limiter could use as the client IP, to confirm the Render and Cloudflare
+// setup. Never the body, email, password or any other header. Remove once confirmed.
+function logClientIp(request) {
+  if (!request.app.get('debugClientIp')) return;
+  // JSON.stringify escapes newlines in header values, so a client cannot forge log lines.
+  const details = JSON.stringify({
+    ip: request.ip,
+    ips: request.ips,
+    xForwardedFor: request.get('x-forwarded-for') ?? null,
+    cfConnectingIp: request.get('cf-connecting-ip') ?? null,
+    remoteAddress: request.socket?.remoteAddress ?? null,
+  });
+  console.log(`[debug-client-ip] failed login ${details}`);
+}
+
 router.post('/register', async (request, response) => {
   // Unknown keys such as "role" are stripped, so new accounts are always customers.
   const parsed = registerSchema.safeParse(request.body ?? {});
@@ -56,6 +72,7 @@ router.post('/login', async (request, response) => {
   const passwordMatches = await verifyPassword(password, user?.passwordHash);
 
   if (!user || !passwordMatches || !user.isActive) {
+    logClientIp(request);
     // Only the attempted email is kept: never the password, and not whether the account
     // exists or is deactivated (the answer is the same for all three).
     await recordAudit({
