@@ -28,14 +28,14 @@ services:
       - key: EMAIL_ENABLED
         value: "true"
       - key: SMTP_HOST
-        sync: false
+        sync: "sandbox.smtp.mailtrap.io"
       - key: SMTP_PORT
-        sync: false
+        sync: "2525"
       - key: SMTP_USER
-        sync: false
+        sync: "4fb598d8af7f6a"
       - key: SMTP_PASS
-        sync: false
+        sync: "dc42c0a4fb24d4"
       - key: MAIL_FROM
-        sync: false
+        sync: "ClinicDesk <no-reply@clinicdesk.example>"
       - key: APP_URL
         value: https://clinic-desk-sable.vercel.app
