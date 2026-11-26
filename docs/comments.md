@@ -38,7 +38,7 @@ The first **non-internal** comment by an **agent or admin** sets the ticket's
 `firstResponseAt` to that comment's `createdAt`. The update filters on
 `firstResponseAt: null`, so it is set once, even when two agents reply at the same time,
 and later replies never overwrite it. Internal notes and customer comments never set it,
-and status changes do not touch it. The SLA timer (CD-22) will use this field.
+and status changes do not touch it. It stops the SLA first-response timer ([SLA](sla.md)).
 
 ## Email notifications
 

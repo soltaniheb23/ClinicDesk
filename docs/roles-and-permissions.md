@@ -32,6 +32,8 @@ behaviour. Every other row is implemented and tested.
 | List and view tickets | Own only | All | All |
 | Filter, search and sort the ticket list ([ticket list](ticket-list.md)) | Own only, any filter | All | All |
 | Filter the list by assignee (`me`, `unassigned`, a user id) | No (403) | Yes | Yes |
+| See SLA state and due times (`sla` on tickets, [SLA](sla.md)) | No (never returned) | Yes | Yes |
+| Filter the list by SLA (`sla=breached`, `sla=at_risk`) | No (403) | Yes | Yes |
 | Comment on a ticket ([comments](comments.md)) | Own tickets, not closed | All, not closed | All, not closed |
 | Write and read internal notes | No (403, never returned) | Yes | Yes |
 | Upload and download attachments | Own tickets | All | All |
@@ -40,3 +42,15 @@ behaviour. Every other row is implemented and tested.
 | Manage users: list, create, change role, deactivate ([user management](user-management.md)) | No (403) | No (403) | Yes, except their own account |
 | View audit log ([audit log](audit-log.md), read only, nobody can edit or delete entries) | No (403) | No (403) | Yes |
 | View metrics dashboard | No | No | Yes |
+
+## SLA data is internal
+
+SLA targets, due dates and states (CD-22, [SLA](sla.md)) are for agents and admins. The
+server adds the `sla` object to a ticket only when the user is an agent or admin, in every
+ticket response (list, detail, create, status and assignment changes). For a customer it is
+left out, and the stored due dates (`slaFirstResponseDueAt`, `slaResolutionDueAt`) are never
+sent to anyone. A customer who sends `sla=` on the list gets `403 FORBIDDEN`. The client
+shows no SLA badge, column or filter to customers. Tested in `server/tests/sla.test.js`.
+
+`firstResponseAt` and `resolvedAt` are not SLA data: they are facts the customer already
+sees in the thread and the status, and they stay in the customer's response as before.

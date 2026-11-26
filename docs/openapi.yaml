@@ -227,6 +227,15 @@ paths:
               - { type: string, enum: [me, unassigned] }
               - { type: string, pattern: '^[0-9a-fA-F]{24}$' }
           example: me
+        - name: sla
+          in: query
+          description: >
+            Agents and admins only (a customer gets 403, checked after the 400 checks). One
+            SLA state: `breached` or `at_risk` (shown as "Due soon"). Computed at request time
+            from the ticket's stored due dates (docs/sla.md); tickets without an SLA never
+            match. Combines with every other filter, the search, sorting and paging.
+          schema: { type: string, enum: [breached, at_risk] }
+          example: breached
         - name: q
           in: query
           description: >
@@ -264,6 +273,7 @@ paths:
                         resolvedAt: null
                         createdAt: '2026-12-01T09:15:00.000Z'
                         updatedAt: '2026-12-01T09:15:00.000Z'
+                        sla: { state: at_risk, kind: first_response, dueAt: '2026-12-01T13:15:00.000Z' }
                     page: 1
                     limit: 10
                     total: 1
@@ -290,6 +300,13 @@ paths:
                           message: 'Status must be one or more of: open, in_progress, waiting, resolved, closed (comma-separated)'
                         - field: sort
                           message: 'Sort must be one of: createdAt, updatedAt, priority, status'
+                badSla:
+                  summary: GET /tickets?sla=late
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid
+                      details: [ { field: sla, message: 'SLA must be one of: breached, at_risk' } ]
                 operator:
                   summary: GET /tickets?status[$ne]=closed
                   value:
@@ -298,7 +315,7 @@ paths:
                       message: Some fields are invalid
                       details: [ { field: 'status[$ne]', message: Unknown query parameter } ]
         '403':
-          description: A customer sent `assignee` (FORBIDDEN). Checked after the 400 checks.
+          description: A customer sent `assignee` or `sla` (FORBIDDEN). Checked after the 400 checks.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -397,6 +414,7 @@ paths:
                   resolvedAt: null
                   createdAt: '2026-12-01T09:15:00.000Z'
                   updatedAt: '2026-12-01T09:40:00.000Z'
+                  sla: { state: ok, kind: resolution, dueAt: '2026-12-02T09:15:00.000Z' }
                   allowedNextStatuses: [waiting, resolved]
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404':
@@ -427,8 +445,9 @@ paths:
         update is not applied and 409 STATUS_CONFLICT is returned.
 
 
-        Moving to resolved sets `resolvedAt`; reopening (resolved → in_progress)
-        clears it. `firstResponseAt` is not changed here.
+        Moving to resolved sets `resolvedAt`; closing keeps it (or sets it if it is
+        missing); reopening (resolved → in_progress) clears it. `resolvedAt` stops the SLA
+        resolution timer (docs/sla.md). `firstResponseAt` is not changed here.
       parameters: [ { $ref: '#/components/parameters/TicketId' } ]
       requestBody:
         required: true
@@ -1298,6 +1317,29 @@ components:
         resolvedAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        sla:
+          allOf: [ { $ref: '#/components/schemas/Sla' } ]
+          description: >
+            Agents and admins only. Left out of every response to a customer (list, detail,
+            create, status and assignment changes).
+    Sla:
+      type: object
+      description: >
+        SLA state of a ticket at the time of the response (docs/sla.md). All three fields
+        are null for tickets created before CD-22, which have no SLA.
+      required: [state, kind, dueAt]
+      properties:
+        state:
+          type: string
+          nullable: true
+          enum: [ok, at_risk, breached, met, null]
+          description: at_risk once 75% of the time to dueAt has passed; met when both targets were met
+        kind:
+          type: string
+          nullable: true
+          enum: [first_response, resolution, null]
+          description: The timer the state refers to
+        dueAt: { type: string, format: date-time, nullable: true }
     CommentAuthor:
       type: object
       description: A comment author. Never includes email or passwordHash.

@@ -15,6 +15,7 @@ All parameters are optional.
 | `priority` | `low`, `normal`, `high`, `urgent`, or a comma-separated list | All |
 | `category` | `it`, `facility`, `account`, `other`, or a comma-separated list | All |
 | `assignee` | A user id, `me` or `unassigned`. **Agents and admins only** | All |
+| `sla` | `breached` or `at_risk` (one value). **Agents and admins only** ([SLA](sla.md)) | All |
 | `q` | Title search, 1 to 100 characters after trimming | None |
 | `sort` | `createdAt`, `updatedAt`, `priority`, `status` | `createdAt` |
 | `order` | `asc`, `desc` | `desc` |
@@ -24,6 +25,18 @@ Different filters are combined with AND; the values of one list with OR. For exa
 
 The response is `{ items, page, limit, total, totalPages }`; `total` and `totalPages`
 count the filtered tickets. A page past the end returns an empty `items` array.
+
+### SLA filter
+
+`sla=breached` or `sla=at_risk` returns the tickets in that SLA state at the time of the
+request, using the same rules as the `sla` object on each ticket ([SLA](sla.md)). The
+condition is built by the server from the stored due dates and the server's clock
+(`server/src/sla/query.js`); no request value reaches it. It is part of the same filter as
+everything else, so it combines with the other filters, the search, sorting and paging, and
+`total` counts only matching tickets. Tickets created before CD-22 have no SLA and never
+match. `breached` includes tickets that were resolved late; add `status=open,in_progress,waiting`
+to see only the ones that still need work. There is no index for this filter: it reads the
+tickets left after the other filters, which is fine at ClinicDesk's size.
 
 ### Title search
 
@@ -54,7 +67,7 @@ Checks run in this order:
    an unknown parameter, a repeated parameter (`status=a&status=b`), or an operator form
    such as `status[$ne]=closed` or `$where=1`. Each problem has its own entry in
    `details`, with the parameter name as sent in `field`.
-2. **403 FORBIDDEN**: a customer sent `assignee`.
+2. **403 FORBIDDEN**: a customer sent `assignee` or `sla`.
 
 ## What the customer scope guarantees
 
@@ -62,7 +75,7 @@ Checks run in this order:
   logged-in user) is added by the server after all filters, so no filter can replace it.
 - Filters and search only narrow the customer's own tickets. A search or filter that
   matches another customer's ticket returns nothing, and `total` does not count it.
-- A customer cannot filter by assignee (403), and `createdBy` is not a parameter (400).
+- A customer cannot filter by assignee or SLA (403), and `createdBy` is not a parameter (400).
 - No request value is used as a MongoDB key or operator: enum values come from fixed lists,
   ids are checked and converted by the server, and the search text is an escaped literal.
 - `items` and `total` use the same filter, so the count never leaks tickets that the page
@@ -81,7 +94,9 @@ priority or status ranks the tickets in the query, which is fine at this size.
 
 - The toolbar has a search box (applied after a 300 ms pause, or at once with Enter), and
   selects for status, priority and category. Agents and admins also get an assignee select
-  (All, Me, Unassigned) and a "Sort by" select. "Clear filters" appears while a filter or
+  (All, Me, Unassigned), an SLA select (All, Breached, Due soon) and a "Sort by" select.
+- Agents and admins see an SLA column (a card row on phones) with a text badge ("On track",
+  "Due soon", "Breached", "Met") and the due time in their locale. Customers see no SLA. "Clear filters" appears while a filter or
   search is active; it keeps the sort.
 - Below the tablet breakpoint (640px, CD-36) the table is replaced by one card per
   ticket, and the "Sort by" select is shown to every role instead of the sortable headers
