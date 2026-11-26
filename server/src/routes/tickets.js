@@ -15,6 +15,8 @@ const {
   isWorkflowTransition,
 } = require('../tickets/statusWorkflow');
 const { buildListFilter, buildListPipeline, listQuerySchema } = require('../tickets/listQuery');
+const { slaSnapshot } = require('../sla/policy');
+const { getSlaState } = require('../sla/state');
 
 const router = express.Router();
 
@@ -26,9 +28,13 @@ function publicUser(user) {
   return user ? { id: user._id.toString(), name: user.name } : null;
 }
 
-// Builds the API shape from a lean, populated ticket, field by field.
-function serializeTicket(ticket) {
-  return {
+const STAFF_ROLES = ['agent', 'admin'];
+
+// Builds the API shape from a lean, populated ticket, field by field. The SLA due dates are
+// never sent as fields; agents and admins get the computed `sla` object, customers get no
+// SLA data at all (docs/sla.md, docs/roles-and-permissions.md).
+function serializeTicket(ticket, user, now = new Date()) {
+  const serialized = {
     id: ticket._id.toString(),
     title: ticket.title,
     description: ticket.description,
@@ -42,12 +48,14 @@ function serializeTicket(ticket) {
     createdAt: ticket.createdAt,
     updatedAt: ticket.updatedAt,
   };
+  if (STAFF_ROLES.includes(user.role)) serialized.sla = getSlaState(ticket, now);
+  return serialized;
 }
 
 // Detail-style response: the ticket plus the statuses this user may move it to next.
 function serializeTicketFor(ticket, user) {
   return {
-    ...serializeTicket(ticket),
+    ...serializeTicket(ticket, user),
     allowedNextStatuses: allowedNextStatuses(ticket.status, user.role),
   };
 }
@@ -104,7 +112,6 @@ function serializeComment(comment) {
 const FORBIDDEN = {
   error: { code: 'FORBIDDEN', message: 'You do not have permission to do this' },
 };
-const STAFF_ROLES = ['agent', 'admin'];
 
 function withPublicUsers(query) {
   return query
@@ -139,7 +146,15 @@ router.post('/', async (request, response) => {
     return validationError(response, parsed.error);
   }
 
-  const created = await Ticket.create({ ...parsed.data, createdBy: request.user.id });
+  // The SLA due dates are a snapshot of the policy now (CD-22): createdAt is set here, not by
+  // Mongoose, so both come from the same instant.
+  const createdAt = new Date();
+  const created = await Ticket.create({
+    ...parsed.data,
+    createdBy: request.user.id,
+    createdAt,
+    ...slaSnapshot(parsed.data.priority, createdAt),
+  });
   const ticket = await withPublicUsers(Ticket.findById(created._id));
 
   // After the write, not awaited: the email never delays or changes the response (CD-21).
@@ -148,12 +163,12 @@ router.post('/', async (request, response) => {
     author: { id: request.user.id, name: ticket.createdBy?.name },
   });
 
-  return response.status(201).json({ ticket: serializeTicket(ticket) });
+  return response.status(201).json({ ticket: serializeTicket(ticket, request.user) });
 });
 
 // Customers see their own tickets; agents and admins see all (docs/ticket-list.md).
-// Checks, in order: 400 bad query -> 403 customer filters by assignee. The customer scope
-// is part of the filter, so filters and search only ever narrow it; the count and the
+// Checks, in order: 400 bad query -> 403 customer filters by assignee or SLA. The customer
+// scope is part of the filter, so filters and search only ever narrow it; the count and the
 // page use the same filter.
 router.get('/', async (request, response) => {
   const parsed = listQuerySchema.safeParse(request.query ?? {});
@@ -163,12 +178,15 @@ router.get('/', async (request, response) => {
   }
 
   const query = parsed.data;
-  if (query.assignee !== undefined && !STAFF_ROLES.includes(request.user.role)) {
+  const isStaff = STAFF_ROLES.includes(request.user.role);
+  if ((query.assignee !== undefined || query.sla !== undefined) && !isStaff) {
     return response.status(403).json(FORBIDDEN);
   }
 
   const { page, limit } = query;
-  const filter = buildListFilter(query, request.user);
+  // One instant for the SLA filter and the SLA state of every ticket on the page.
+  const now = new Date();
+  const filter = buildListFilter(query, request.user, now);
 
   const [rows, total] = await Promise.all([
     Ticket.aggregate(buildListPipeline(filter, query)),
@@ -180,7 +198,7 @@ router.get('/', async (request, response) => {
   ]);
 
   return response.json({
-    items: tickets.map(serializeTicket),
+    items: tickets.map((ticket) => serializeTicket(ticket, request.user, now)),
     page,
     limit,
     total,
@@ -234,8 +252,12 @@ router.patch('/:id/status', async (request, response) => {
     });
   }
 
+  // resolvedAt stops the SLA resolution timer (CD-22): set on resolved, kept on closed (or
+  // set there if it is missing), cleared on reopen. The status condition below makes this
+  // one guarded update, so it never applies on top of someone else's change.
   const update = { status: nextStatus };
   if (nextStatus === 'resolved') update.resolvedAt = new Date();
+  if (nextStatus === 'closed' && !ticket.resolvedAt) update.resolvedAt = new Date();
   if (currentStatus === 'resolved' && nextStatus === 'in_progress') update.resolvedAt = null;
   // firstResponseAt is left alone: the first agent comment sets it (CD-14).
 
@@ -385,8 +407,8 @@ router.post('/:id/comments', async (request, response) => {
     internal: parsed.data.internal,
   });
 
-  // The first public staff reply starts the SLA clock (CD-22). The filter makes this a
-  // no-op once firstResponseAt is set, even with two replies at the same time.
+  // The first public staff reply stops the SLA first-response timer (CD-14, CD-22). The
+  // filter makes this a no-op once firstResponseAt is set, even with two replies at once.
   if (isStaff && !created.internal) {
     await Ticket.findOneAndUpdate(
       { _id: ticket._id, firstResponseAt: null },

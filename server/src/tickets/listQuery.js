@@ -7,6 +7,8 @@ const mongoose = require('mongoose');
 const { z } = require('zod');
 const { CATEGORIES, PRIORITIES } = require('../models/Ticket');
 const { STATUSES } = require('./statusWorkflow');
+const { FILTER_STATES } = require('../sla/state');
+const { slaFilterExpression } = require('../sla/query');
 const {
   escapeRegex,
   pageLimit,
@@ -51,6 +53,10 @@ const listShape = {
       error: assigneeMessage,
     })
     .optional(),
+  // Agents and admins only (the route answers 403 for customers). One value, no list.
+  sla: z
+    .enum(FILTER_STATES, { error: `SLA must be one of: ${FILTER_STATES.join(', ')}` })
+    .optional(),
   q: searchText,
   sort: z
     .enum(SORT_FIELDS, { error: `Sort must be one of: ${SORT_FIELDS.join(', ')}` })
@@ -68,7 +74,8 @@ function toObjectId(id) {
 
 // The customer scope is spread last, so no filter can replace or widen it. Ids are real
 // ObjectIds because the same filter is used in an aggregation, which does not cast.
-function buildListFilter(query, user) {
+// `now` is the server's time for the SLA filter, so the page and the count agree.
+function buildListFilter(query, user, now = new Date()) {
   const filter = {};
 
   if (query.status) filter.status = { $in: query.status };
@@ -80,6 +87,8 @@ function buildListFilter(query, user) {
   else if (query.assignee) filter.assignee = toObjectId(query.assignee);
 
   if (query.q) filter.title = { $regex: escapeRegex(query.q), $options: 'i' };
+
+  if (query.sla) filter.$expr = slaFilterExpression(query.sla, now);
 
   const scope = user.role === 'customer' ? { createdBy: toObjectId(user.id) } : {};
   return { ...filter, ...scope };
