@@ -109,6 +109,8 @@ the secret scan and the open findings are in
 |---|---|---|
 | `CLIENT_ORIGIN` | none | Allowed frontend origins, comma-separated, exact matches only (`https://clinicdesk.vercel.app,https://staging.example.com`). `*` stops the server at startup. |
 | `TRUST_PROXY` | `1` in production, otherwise `false` | Proxy hops in front of the API, so the rate limits see the client's IP. Render needs `1`. `true` is refused. |
+| `TRUST_CF_CONNECTING_IP` | `false` | `true`: the rate limits key on Cloudflare's `CF-Connecting-IP` header (when it is a valid IP address), not on `X-Forwarded-For`. Set `true` on Render. Only for a host that every request reaches through Cloudflare. Anything other than `true` or `false` stops the server at startup. |
+| `DEBUG_CLIENT_IP` | `false` | **Temporary.** `true` logs one line per failed login with the client-IP inputs (see below). |
 | `JWT_SECRET` | none | At least 32 characters in production. |
 | `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_LOGIN_WINDOW_MS` | 10 per 15 minutes | Failed logins per IP. Successful logins are not counted. |
 | `RATE_LIMIT_REGISTER_MAX`, `RATE_LIMIT_REGISTER_WINDOW_MS` | 5 per hour | Registrations per IP. |
@@ -116,6 +118,43 @@ the secret scan and the open findings are in
 
 Limited requests get `429 RATE_LIMITED` with a `Retry-After` header. The counters are kept in
 memory, which suits the single Render instance. The limits are off when `NODE_ENV=test`.
+
+### Rate-limit client key (Render and Cloudflare)
+
+Every limiter counts per client key, so the key must be one stable value per client that the
+client cannot choose. If a client can change it, every attempt gets a fresh counter and the
+login limit never triggers. If all clients share it, one attacker locks everyone out.
+
+On Render, requests pass through Cloudflare and Render's load balancer before they reach the
+API. A client's own `X-Forwarded-For` value stays in that header, and no fixed
+`TRUST_PROXY` hop count picked an entry the client could not choose: with `1` and with `2`,
+14 wrong logins with different `X-Forwarded-For` values all got 401. Cloudflare's `CF-Connecting-IP` header holds the address
+that connected to Cloudflare, and Cloudflare overwrites any value the client sends.
+
+**On Render, set `TRUST_CF_CONNECTING_IP=true` and leave `TRUST_PROXY` as it is** (unset,
+which means `1`). `render.yaml` already does this. The limiters then use `CF-Connecting-IP`
+when it is a bare IPv4 or IPv6 address and fall back to `req.ip` otherwise. IPv6 keys are
+reduced to their /56 network (express-rate-limit's `ipKeyGenerator`), so one client cannot
+rotate through its own IPv6 range.
+
+> **Risk:** `CF-Connecting-IP` is just a request header. It can only be trusted when every
+> request reaches the API through Cloudflare. On a host that can be reached without Cloudflare
+> (local development, another hosting provider, a direct origin address), any client can send
+> its own `CF-Connecting-IP` and get a fresh counter for every attempt. **Never set
+> `TRUST_CF_CONNECTING_IP=true` for a host that is not behind Cloudflare.** It is `false` by
+> default.
+
+**Temporary debug log.** To see what the API receives, set `DEBUG_CLIENT_IP=true` on Render
+and redeploy. Every failed login then logs one line in the Render logs:
+
+```
+[debug-client-ip] failed login {"ip":"…","ips":[…],"xForwardedFor":"…","cfConnectingIp":"…","remoteAddress":"…"}
+```
+
+It holds `req.ip`, `req.ips`, the `X-Forwarded-For` and `CF-Connecting-IP` headers and the
+socket address, nothing else (no email, password, token or body). Check that
+`cfConnectingIp` is your own public IP, also when you send a fake `CF-Connecting-IP` with curl.
+Then set `DEBUG_CLIENT_IP=false` again. The log will be removed once the setup is confirmed.
 
 The client's CSP (`connect-src` in `client/vercel.json`) allows the API at
 `https://clinicdesk-api-2uh0.onrender.com`. When the Render service URL changes,

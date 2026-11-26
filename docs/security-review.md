@@ -15,10 +15,10 @@ The status is one of:
 | A01 | Broken Access Control | ok | `requireRole` and `canAccessOwnedResource` (`server/src/auth/authorize.js`). Customers get 404 for other customers' tickets. Admin-only user and audit routes. Every protected route is tested against every role in `server/tests/routeAccess.test.js`. | None |
 | A02 | Cryptographic Failures | ok, and fixed in this PR | bcrypt with 12 rounds (`server/src/auth/password.js`). JWT verification pinned to `HS256` (`authenticate.js`). **New:** in production, `JWT_SECRET` must be at least 32 characters (`config.js`, `config.test.js`). **New:** HSTS on every API response (helmet, `security.test.js`). | Session token in `sessionStorage` (T4) |
 | A03 | Injection | ok, and fixed in this PR | Every body and query is validated with zod. Unknown or operator-style query keys (`role[$ne]`) are a 400. Searches are escaped literals (`queryParams.js`). React escapes output, and there is no `dangerouslySetInnerHTML` or `eval`. **New:** a strict CSP on the API (`default-src 'none'`) and on the client (`'self'` only, no `unsafe-inline`; `client/vercel.json`, `vercelHeaders.test.js`). | None |
-| A04 | Insecure Design | fixed in this PR | **New:** rate limits on login (failed attempts), register, and the whole API (`server/src/security/rateLimit.js`, `security.test.js`). Last-admin and self-change safeguards (`docs/user-management.md`). Same answer for an unknown email, a wrong password and a deactivated account. | Per-account login throttling (T3); shared limiter store before scaling (T2) |
+| A04 | Insecure Design | fixed in this PR | **New:** rate limits on login (failed attempts), register, and the whole API (`server/src/security/rateLimit.js`, `security.test.js`). **New (fix):** behind Cloudflare the limiters key on `CF-Connecting-IP` (`TRUST_CF_CONNECTING_IP=true`), not on a client-controlled `X-Forwarded-For` entry; IPv6 is counted per /56 (see "Rate-limit client key"). Last-admin and self-change safeguards (`docs/user-management.md`). Same answer for an unknown email, a wrong password and a deactivated account. | Per-account login throttling (T3); shared limiter store before scaling (T2) |
 | A05 | Security Misconfiguration | fixed in this PR | **New:** helmet on every response, including 404s and errors. **New:** CORS exact-match allowlist, with `*` refused at startup. **New:** JSON 404 instead of Express's HTML page; no `X-Powered-By`. **New:** startup checks for `CLIENT_ORIGIN`, `TRUST_PROXY` and `RATE_LIMIT_*`. **New:** client headers (`nosniff`, `DENY`, `Referrer-Policy`, `Permissions-Policy`). 500s never include error details. | None |
 | A06 | Vulnerable and Outdated Components | finding | `npm audit`: client 0; server production dependencies 0. Server dev dependencies: 19 moderate, 0 high, 0 critical (see below). Lockfiles are used with `npm ci` in CI. | Dev toolchain advisories and dependency automation (T5) |
-| A07 | Identification and Authentication Failures | ok, and fixed in this PR | Password 8 characters to 72 bytes. bcrypt compares against a dummy hash for unknown emails, so both failures take a similar time. The role and active state are read from the database on every request, so deactivation applies at once. **New:** failed logins are rate limited. | No password change or reset; admin-set temporary passwords never expire (T1). No MFA for admins (T7). |
+| A07 | Identification and Authentication Failures | ok, and fixed in this PR | Password 8 characters to 72 bytes. bcrypt compares against a dummy hash for unknown emails, so both failures take a similar time. The role and active state are read from the database on every request, so deactivation applies at once. **New:** failed logins are rate limited. **New (fix):** the login limit really triggers on Render: before, a different `X-Forwarded-For` on each attempt gave a fresh counter (see "Rate-limit client key"). | No password change or reset; admin-set temporary passwords never expire (T1). No MFA for admins (T7). |
 | A08 | Software and Data Integrity Failures | ok | `package-lock.json` plus `npm ci`. JWTs are signed and the algorithm is pinned. CI runs with `permissions: contents: read`. The audit log is append-only (`docs/audit-log.md`). | GitHub Actions pinned to tags, not commit SHAs (T6) |
 | A09 | Security Logging and Monitoring Failures | ok, with findings | The audit log records logins (including failures), status, assignment and user changes (CD-20). **New:** a rate-limited request (429) writes no audit entry (`security.test.js`), so the limiter also caps how fast an attacker can fill the log. | No retention for the audit log (T8). No alerting on failed-login bursts (part of T3). |
 | A10 | Server-Side Request Forgery | ok | The server makes no outbound HTTP requests. There is no URL input and no webhooks; its only connection is to MongoDB, from `MONGODB_URI`. | None |
@@ -49,7 +49,8 @@ The status is one of:
   elsewhere, so the limiter sees the client's IP behind Render's proxy. `true` is refused
   at startup, because then any client could choose its own IP.
 - **Startup checks** (`server/src/config.js`): in production `JWT_SECRET` must be at least
-  32 characters, and `CLIENT_ORIGIN`, `TRUST_PROXY` and `RATE_LIMIT_*` are validated.
+  32 characters, and `CLIENT_ORIGIN`, `TRUST_PROXY`, `TRUST_CF_CONNECTING_IP`,
+  `DEBUG_CLIENT_IP` and `RATE_LIMIT_*` are validated.
 - Unknown paths answer a **JSON 404** in the uniform error shape.
 - `server/.env.example` documents the new variables and no longer has the client's
   `VITE_API_URL`.
@@ -79,6 +80,35 @@ The status is one of:
   - A build pointing at another API origin was blocked under this policy (1 `connect-src`
     report, and the page shows "Could not reach the ClinicDesk API"). It worked once that
     origin was added to `connect-src`.
+
+## Rate-limit client key
+
+Added by `feature/CD-24-rate-limit-client-ip`, after the first deployment.
+
+- **Why the key matters.** Each limiter counts per key. A key the client can change gives the
+  client a fresh counter per attempt, so brute force is never slowed. A key all clients share
+  lets one attacker lock everyone out.
+- **What went wrong.** On Render the API sits behind Cloudflare and Render's load balancer.
+  `req.ip` comes from `X-Forwarded-For` and the `TRUST_PROXY` hop count, but a client's own
+  `X-Forwarded-For` value stays in that header, and no fixed hop count picked an entry the
+  client could not choose. A test with 14 wrong logins and a different `X-Forwarded-For` on each got 401 every
+  time, with `TRUST_PROXY=1` and with `TRUST_PROXY=2`.
+- **The fix.** `TRUST_CF_CONNECTING_IP=true` (set in `render.yaml`) makes the login, register
+  and global limiters key on `CF-Connecting-IP`. Cloudflare sets it to the address that
+  connected to it and overwrites a client-sent value. It is used only when it is a bare IPv4
+  or IPv6 address (`node:net` `isIP`); otherwise the key is `req.ip`. Every key goes through
+  express-rate-limit's `ipKeyGenerator`, so IPv6 addresses count per /56 network.
+  `X-Forwarded-For` no longer changes the key while the flag is on. `TRUST_PROXY` stays as it
+  was (`1`), so `req.ip` keeps its old meaning as the fallback. Tests:
+  `server/tests/security.test.js` ("rate-limit client key", "clientKeyGenerator") and
+  `server/tests/config.test.js`.
+- **Risk.** The header is spoofable on any host that can be reached without Cloudflare. The
+  flag is `false` by default, must never be turned on for such a host, and any value other
+  than `true` or `false` stops the server at startup.
+- **Temporary debug log.** `DEBUG_CLIENT_IP=true` logs one JSON line per failed login with
+  `req.ip`, `req.ips`, `X-Forwarded-For`, `CF-Connecting-IP` and the socket address (no email,
+  password, token or body). It is off by default and is to be removed once the Render setup is
+  confirmed.
 
 ## Secret scan
 

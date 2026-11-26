@@ -1,6 +1,9 @@
 const {
   getStartupErrors,
+  parseBooleanFlag,
   parseClientOrigins,
+  parseDebugClientIp,
+  parseTrustCfConnectingIp,
   parseTrustProxy,
   RATE_LIMIT_VARIABLES,
 } = require('../src/config');
@@ -40,6 +43,8 @@ describe('getStartupErrors', () => {
         NODE_ENV: 'production',
         CLIENT_ORIGIN: 'https://clinicdesk.vercel.app, https://staging.example.com/',
         TRUST_PROXY: '1',
+        TRUST_CF_CONNECTING_IP: 'true',
+        DEBUG_CLIENT_IP: 'false',
         RATE_LIMIT_LOGIN_MAX: '20',
       }),
     ).toEqual([]);
@@ -66,6 +71,18 @@ describe('getStartupErrors', () => {
   it.each(['true', 'yes', '-1', '1.5'])('refuses TRUST_PROXY=%s', (value) => {
     expect(getStartupErrors({ ...BASE, TRUST_PROXY: value })).toEqual([
       expect.stringContaining('TRUST_PROXY must be'),
+    ]);
+  });
+
+  it.each(['yes', '1', 'TRUE', 'ture', 'on'])('refuses TRUST_CF_CONNECTING_IP=%s', (value) => {
+    expect(getStartupErrors({ ...BASE, TRUST_CF_CONNECTING_IP: value })).toEqual([
+      `TRUST_CF_CONNECTING_IP must be "true" or "false" (got "${value}"). Set "true" only when every request reaches the API through Cloudflare.`,
+    ]);
+  });
+
+  it.each(['yes', '1', 'False'])('refuses DEBUG_CLIENT_IP=%s', (value) => {
+    expect(getStartupErrors({ ...BASE, DEBUG_CLIENT_IP: value })).toEqual([
+      `DEBUG_CLIENT_IP must be "true" or "false" (got "${value}").`,
     ]);
   });
 
@@ -103,5 +120,35 @@ describe('parseTrustProxy', () => {
     expect(parseTrustProxy({ TRUST_PROXY: '0' })).toBe(false);
     expect(parseTrustProxy({ TRUST_PROXY: '2' })).toBe(2);
     expect(parseTrustProxy({ TRUST_PROXY: 'true' })).toBeNull();
+  });
+});
+
+describe('parseBooleanFlag', () => {
+  it('reads "true" and "false", and treats unset or empty as false', () => {
+    expect(parseBooleanFlag('true')).toBe(true);
+    expect(parseBooleanFlag(' true ')).toBe(true);
+    expect(parseBooleanFlag('false')).toBe(false);
+    expect(parseBooleanFlag('')).toBe(false);
+    expect(parseBooleanFlag(undefined)).toBe(false);
+  });
+
+  it('returns null for anything else', () => {
+    for (const value of ['yes', '1', '0', 'TRUE', 'on']) {
+      expect(parseBooleanFlag(value)).toBeNull();
+    }
+  });
+});
+
+describe('parseTrustCfConnectingIp and parseDebugClientIp', () => {
+  it('default to false, also in production', () => {
+    expect(parseTrustCfConnectingIp({ NODE_ENV: 'production' })).toBe(false);
+    expect(parseDebugClientIp({ NODE_ENV: 'production' })).toBe(false);
+  });
+
+  it('read their own variable', () => {
+    expect(parseTrustCfConnectingIp({ TRUST_CF_CONNECTING_IP: 'true' })).toBe(true);
+    expect(parseTrustCfConnectingIp({ DEBUG_CLIENT_IP: 'true' })).toBe(false);
+    expect(parseDebugClientIp({ DEBUG_CLIENT_IP: 'true' })).toBe(true);
+    expect(parseDebugClientIp({ TRUST_CF_CONNECTING_IP: 'true' })).toBe(false);
   });
 });
