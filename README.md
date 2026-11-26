@@ -181,6 +181,7 @@ API calls.
 - Audit log: [`docs/audit-log.md`](docs/audit-log.md)
 - Security review (OWASP Top 10): [`docs/security-review.md`](docs/security-review.md)
 - Email notifications: [`docs/notifications.md`](docs/notifications.md); change request record: [`docs/change-requests/CD-21.md`](docs/change-requests/CD-21.md)
+- SLA timer (targets, states, who sees them): [`docs/sla.md`](docs/sla.md); change request record: [`docs/change-requests/CD-22.md`](docs/change-requests/CD-22.md)
 - Responsive layout and screenshots: [`docs/responsive/`](docs/responsive/README.md)
 
 To view the API contract as interactive documentation, paste `docs/openapi.yaml` into [Swagger Editor](https://editor.swagger.io).

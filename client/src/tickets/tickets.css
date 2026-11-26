@@ -649,3 +649,38 @@
     align-self: flex-start;
   }
 }
+
+/* SLA badge and due time (CD-22, docs/sla.md). The label says the state; the tints reuse
+   the existing token pairs, which all pass 4.5:1. */
+.sla {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.sla-due {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.badge-sla-ok {
+  background: var(--color-status-open-bg);
+  color: var(--color-status-open-text);
+}
+
+.badge-sla-at_risk {
+  background: var(--color-status-waiting-bg);
+  color: var(--color-status-waiting-text);
+}
+
+.badge-sla-breached {
+  background: var(--color-priority-urgent-bg);
+  color: var(--color-priority-urgent-text);
+}
+
+.badge-sla-met {
+  background: var(--color-status-in-progress-bg);
+  color: var(--color-status-in-progress-text);
+}

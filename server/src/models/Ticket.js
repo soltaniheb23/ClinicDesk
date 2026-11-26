@@ -14,8 +14,15 @@ const ticketSchema = new mongoose.Schema(
     // Set from the authenticated user by the route, never from the request body.
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     assignee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    // Set once by the first public agent/admin reply (CD-14), never by the request body.
     firstResponseAt: { type: Date, default: null },
+    // Set when the ticket is resolved (or closed), cleared when it is reopened.
     resolvedAt: { type: Date, default: null },
+    // SLA snapshot (CD-22, docs/sla.md): createdAt + the policy targets at creation time.
+    // Never recalculated, so a policy change does not move existing tickets. Tickets created
+    // before CD-22 do not have these fields and have no SLA.
+    slaFirstResponseDueAt: { type: Date },
+    slaResolutionDueAt: { type: Date },
   },
   {
     timestamps: true,

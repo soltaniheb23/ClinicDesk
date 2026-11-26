@@ -21,6 +21,25 @@ export const STATUS_LABELS = {
   closed: 'Closed',
 };
 
+// SLA states from the API (server/src/sla/state.js, docs/sla.md). Staff only.
+export const SLA_LABELS = {
+  ok: 'On track',
+  at_risk: 'Due soon',
+  breached: 'Breached',
+  met: 'Met',
+};
+
+// The states the list can filter by (?sla=), in toolbar order.
+export const SLA_FILTER_OPTIONS = [
+  { value: 'breached', label: SLA_LABELS.breached },
+  { value: 'at_risk', label: SLA_LABELS.at_risk },
+];
+
+export const SLA_KIND_LABELS = {
+  first_response: 'First response',
+  resolution: 'Resolution',
+};
+
 export const TITLE_MAX_LENGTH = 120;
 export const DESCRIPTION_MAX_LENGTH = 5000;
 

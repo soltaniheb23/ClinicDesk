@@ -30,6 +30,8 @@ erDiagram
         ObjectId assignee FK
         date firstResponseAt
         date resolvedAt
+        date slaFirstResponseDueAt "CD-22, new tickets only"
+        date slaResolutionDueAt "CD-22, new tickets only"
         date createdAt
         date updatedAt
     }

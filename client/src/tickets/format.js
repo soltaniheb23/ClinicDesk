@@ -16,6 +16,14 @@ export function formatDateTime(value) {
   return `${formatDate(date)}, ${hours}:${minutes}`;
 }
 
+// Date and time in the viewer's locale and time zone (for example "1 Dec 2026, 10:00" or
+// "Dec 1, 2026, 10:00 AM"), for SLA due times. `locale` is for tests.
+export function formatLocaleDateTime(value, locale) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
 // Reads ?page= from the URL; anything that is not a whole number of at least 1 means page 1.
 export function pageFromSearch(searchParams) {
   const page = Number(searchParams.get('page'));

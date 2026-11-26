@@ -42,7 +42,8 @@ stateDiagram-v2
 ## Side effects
 
 - Moving to **resolved** sets `resolvedAt`; **resolved → in progress** clears it; closing
-  keeps it.
+  keeps it (and sets it if it is missing). `resolvedAt` stops the SLA resolution timer, and
+  reopening starts it again against the same due date ([SLA](sla.md)).
 - `firstResponseAt` is not changed by status updates; the first agent comment sets it
   (CD-14).
 

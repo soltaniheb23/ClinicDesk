@@ -9,7 +9,7 @@ import Pagination from '../components/Pagination.jsx';
 import { MEDIA } from '../layout/breakpoints.js';
 import { useMediaQuery } from '../layout/useMediaQuery.js';
 import '../components/forms.css';
-import { PriorityBadge, StatusBadge } from '../tickets/Badges.jsx';
+import { PriorityBadge, SlaBadge, StatusBadge } from '../tickets/Badges.jsx';
 import TicketFilters from '../tickets/TicketFilters.jsx';
 import { formatDate, pageFromSearch } from '../tickets/format.js';
 import {
@@ -48,7 +48,8 @@ function SortableHeader({ field, label, sortState, onSort }) {
   );
 }
 
-function TicketTable({ tickets, listSearch, sortState, onSort }) {
+// `showSla`: agents and admins only (CD-22). Customers never get SLA data from the API.
+function TicketTable({ tickets, listSearch, sortState, onSort, showSla }) {
   return (
     <div className="ticket-table-wrapper">
       <table className="ticket-table">
@@ -63,6 +64,7 @@ function TicketTable({ tickets, listSearch, sortState, onSort }) {
               sortState={sortState}
               onSort={onSort}
             />
+            {showSla && <th scope="col">SLA</th>}
             <th scope="col">Assignee</th>
             <SortableHeader
               field="createdAt"
@@ -90,6 +92,11 @@ function TicketTable({ tickets, listSearch, sortState, onSort }) {
               <td>
                 <PriorityBadge priority={ticket.priority} />
               </td>
+              {showSla && (
+                <td>
+                  <SlaBadge sla={ticket.sla} />
+                </td>
+              )}
               <td>{ticket.assignee?.name ?? 'Unassigned'}</td>
               <td>
                 <time dateTime={ticket.createdAt}>{formatDate(ticket.createdAt)}</time>
@@ -105,7 +112,7 @@ function TicketTable({ tickets, listSearch, sortState, onSort }) {
 // Below the tablet breakpoint (CD-36): one card per ticket instead of the table. Only one of
 // the two is rendered, so screen readers get either a real table or a list of cards with a
 // heading and labelled values, never both.
-function TicketCards({ tickets, listSearch, sortState }) {
+function TicketCards({ tickets, listSearch, sortState, showSla }) {
   return (
     <ul className="ticket-cards" aria-label={`Tickets, ${describeSort(sortState)}`}>
       {tickets.map((ticket) => (
@@ -126,6 +133,14 @@ function TicketCards({ tickets, listSearch, sortState }) {
                 <PriorityBadge priority={ticket.priority} />
               </dd>
             </div>
+            {showSla && ticket.sla?.state && (
+              <div>
+                <dt>SLA</dt>
+                <dd>
+                  <SlaBadge sla={ticket.sla} />
+                </dd>
+              </div>
+            )}
             <div>
               <dt>Assignee</dt>
               <dd>{ticket.assignee?.name ?? 'Unassigned'}</dd>
@@ -260,9 +275,15 @@ function TicketsPage() {
             listSearch={location.search}
             sortState={listState}
             onSort={update}
+            showSla={isStaff}
           />
         ) : (
-          <TicketCards tickets={items} listSearch={location.search} sortState={listState} />
+          <TicketCards
+            tickets={items}
+            listSearch={location.search}
+            sortState={listState}
+            showSla={isStaff}
+          />
         )}
         <Pagination page={page} totalPages={totalPages} onChange={goToPage} />
       </>

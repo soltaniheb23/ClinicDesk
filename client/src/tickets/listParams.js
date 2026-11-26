@@ -1,7 +1,12 @@
 // Filter, search and sort state of the ticket list, kept in the URL (docs/ticket-list.md).
 // Values that the API would reject are ignored here, so a hand-edited or outdated link
 // falls back to "All" instead of an error.
-import { CATEGORY_OPTIONS, PRIORITY_OPTIONS, STATUS_LABELS } from './options.js';
+import {
+  CATEGORY_OPTIONS,
+  PRIORITY_OPTIONS,
+  SLA_FILTER_OPTIONS,
+  STATUS_LABELS,
+} from './options.js';
 
 export const SEARCH_MAX_LENGTH = 100;
 export const SEARCH_DEBOUNCE_MS = 300;
@@ -17,12 +22,13 @@ export const ASSIGNEE_OPTIONS = [
 ];
 
 // The select filters, in toolbar order. `staffOnly` filters are hidden from customers and
-// never sent for them (the API answers 403).
+// never sent for them (the API answers 403). SLA is staff-only data (CD-22, docs/sla.md).
 export const FILTERS = [
   { key: 'status', label: 'Status', options: STATUS_OPTIONS },
   { key: 'priority', label: 'Priority', options: PRIORITY_OPTIONS },
   { key: 'category', label: 'Category', options: CATEGORY_OPTIONS },
   { key: 'assignee', label: 'Assignee', options: ASSIGNEE_OPTIONS, staffOnly: true },
+  { key: 'sla', label: 'SLA', options: SLA_FILTER_OPTIONS, staffOnly: true },
 ];
 
 // Sortable columns and the order a first click uses: newest, most urgent, and the start
@@ -59,7 +65,7 @@ export function visibleFilters(role) {
   return FILTERS.filter((filter) => !filter.staffOnly || isStaffRole(role));
 }
 
-// Reads { status, priority, category, assignee, q, sort, order } from URLSearchParams;
+// Reads { status, priority, category, assignee, sla, q, sort, order } from URLSearchParams;
 // a missing or unknown value is '' (filters) or the default (sort).
 export function listStateFromSearch(searchParams, role) {
   const state = { q: (searchParams.get('q') ?? '').slice(0, SEARCH_MAX_LENGTH) };
