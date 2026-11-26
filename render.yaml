@@ -22,6 +22,20 @@ services:
       # TRUST_PROXY stays unset (1 in production).
       - key: TRUST_CF_CONNECTING_IP
         value: "true"
-      # Temporary: "true" logs the client-IP inputs of each failed login.
-      - key: DEBUG_CLIENT_IP
-        value: "false"
+      # Email notifications (CD-21, docs/notifications.md). With EMAIL_ENABLED=true the API
+      # refuses to start until every SMTP_* value, MAIL_FROM and APP_URL is set. The SMTP
+      # values are set in the Render dashboard only (sync: false), never in this file.
+      - key: EMAIL_ENABLED
+        value: "true"
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: APP_URL
+        value: https://clinic-desk-sable.vercel.app
