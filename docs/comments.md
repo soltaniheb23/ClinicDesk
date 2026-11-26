@@ -40,6 +40,11 @@ The first **non-internal** comment by an **agent or admin** sets the ticket's
 and later replies never overwrite it. Internal notes and customer comments never set it,
 and status changes do not touch it. The SLA timer (CD-22) will use this field.
 
+## Email notifications
+
+A public comment emails the other side of the ticket; an internal note never sends an
+email. See [`notifications.md`](notifications.md).
+
 ## In the client
 
 The ticket page shows the thread below the description: author name, role label

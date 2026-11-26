@@ -111,6 +111,11 @@ the secret scan and the open findings are in
 | `TRUST_PROXY` | `1` in production, otherwise `false` | Proxy hops in front of the API, so the rate limits see the client's IP. Render needs `1`. `true` is refused. |
 | `TRUST_CF_CONNECTING_IP` | `false` | `true`: the rate limits key on Cloudflare's `CF-Connecting-IP` header (when it is a valid IP address), not on `X-Forwarded-For`. Set `true` on Render. Only for a host that every request reaches through Cloudflare. Anything other than `true` or `false` stops the server at startup. |
 | `DEBUG_CLIENT_IP` | `false` | **Temporary.** `true` logs one line per failed login with the client-IP inputs (see below). |
+| `EMAIL_ENABLED` | `false` | `true` sends email on new tickets and replies ([`docs/notifications.md`](docs/notifications.md)). Then all of the variables below are required, or the server stops at startup. |
+| `SMTP_HOST`, `SMTP_PORT` | none | SMTP server and port (`587` STARTTLS or `465` TLS). Use a sandbox such as Mailtrap on staging. |
+| `SMTP_USER`, `SMTP_PASS` | none | SMTP credentials. Secrets: set them in the hosting dashboard only. |
+| `MAIL_FROM` | none | Sender, for example `ClinicDesk <no-reply@example.com>`. |
+| `APP_URL` | none | The client's http(s) URL, used for the ticket link in emails (for example `https://clinicdesk.vercel.app`). |
 | `JWT_SECRET` | none | At least 32 characters in production. |
 | `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_LOGIN_WINDOW_MS` | 10 per 15 minutes | Failed logins per IP. Successful logins are not counted. |
 | `RATE_LIMIT_REGISTER_MAX`, `RATE_LIMIT_REGISTER_WINDOW_MS` | 5 per hour | Registrations per IP. |
@@ -174,6 +179,7 @@ API calls.
 - Admin user management and the first admin: [`docs/user-management.md`](docs/user-management.md)
 - Audit log: [`docs/audit-log.md`](docs/audit-log.md)
 - Security review (OWASP Top 10): [`docs/security-review.md`](docs/security-review.md)
+- Email notifications: [`docs/notifications.md`](docs/notifications.md); change request record: [`docs/change-requests/CD-21.md`](docs/change-requests/CD-21.md)
 - Responsive layout and screenshots: [`docs/responsive/`](docs/responsive/README.md)
 
 To view the API contract as interactive documentation, paste `docs/openapi.yaml` into [Swagger Editor](https://editor.swagger.io).
