@@ -72,6 +72,85 @@ function parseDebugClientIp(env) {
   return parseBooleanFlag(env.DEBUG_CLIENT_IP);
 }
 
+// The variables EMAIL_ENABLED=true needs (src/notifications/mailer.js, docs/notifications.md).
+const MAIL_REQUIRED_VARIABLES = [
+  'SMTP_HOST',
+  'SMTP_PORT',
+  'SMTP_USER',
+  'SMTP_PASS',
+  'MAIL_FROM',
+  'APP_URL',
+];
+
+// True for an absolute http(s) URL without credentials, query or fragment.
+function isAppUrl(value) {
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === 'https:' || url.protocol === 'http:') &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash
+    );
+  } catch {
+    return false;
+  }
+}
+
+// Control characters (CR and LF included) never belong in a mail header value.
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
+
+// Mail settings from env (docs/notifications.md). `enabled` is null for an invalid
+// EMAIL_ENABLED (a startup error). Values are trimmed; APP_URL loses its trailing slashes so
+// links can be built as APP_URL + path.
+function parseMailConfig(env) {
+  const value = (name) => env[name]?.trim() || undefined;
+  return {
+    enabled: parseBooleanFlag(env.EMAIL_ENABLED),
+    host: value('SMTP_HOST'),
+    port: value('SMTP_PORT') === undefined ? undefined : Number(value('SMTP_PORT')),
+    user: value('SMTP_USER'),
+    pass: env.SMTP_PASS || undefined,
+    from: value('MAIL_FROM'),
+    appUrl: value('APP_URL')?.replace(/\/+$/, ''),
+  };
+}
+
+function getMailErrors(env) {
+  const config = parseMailConfig(env);
+  if (config.enabled === null) {
+    return [`EMAIL_ENABLED must be "true" or "false" (got "${env.EMAIL_ENABLED}").`];
+  }
+  if (!config.enabled) return [];
+
+  const errors = [];
+  const missing = MAIL_REQUIRED_VARIABLES.filter((name) => !env[name]?.trim());
+  if (missing.length > 0) {
+    errors.push(
+      `EMAIL_ENABLED is "true", but ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} not set (see server/.env.example).`,
+    );
+  }
+  if (
+    config.port !== undefined &&
+    !(Number.isInteger(config.port) && config.port > 0 && config.port <= 65535)
+  ) {
+    errors.push('SMTP_PORT must be a whole number from 1 to 65535 (for example 587).');
+  }
+  if (config.from && (CONTROL_CHARACTERS.test(config.from) || !config.from.includes('@'))) {
+    errors.push(
+      'MAIL_FROM must be one email address, optionally with a name (ClinicDesk <no-reply@example.com>), on one line.',
+    );
+  }
+  if (config.appUrl !== undefined && !isAppUrl(config.appUrl)) {
+    errors.push(
+      'APP_URL must be the http(s) URL of the client, for example https://clinicdesk.vercel.app.',
+    );
+  }
+  return errors;
+}
+
 function isPositiveInteger(value) {
   return /^[1-9]\d*$/.test(String(value).trim());
 }
@@ -122,6 +201,8 @@ function getStartupErrors(env) {
     errors.push(`DEBUG_CLIENT_IP must be "true" or "false" (got "${env.DEBUG_CLIENT_IP}").`);
   }
 
+  errors.push(...getMailErrors(env));
+
   for (const name of RATE_LIMIT_VARIABLES) {
     if (env[name] !== undefined && env[name] !== '' && !isPositiveInteger(env[name])) {
       errors.push(`${name} must be a whole number greater than 0.`);
@@ -133,11 +214,13 @@ function getStartupErrors(env) {
 
 module.exports = {
   JWT_SECRET_MIN_LENGTH,
+  MAIL_REQUIRED_VARIABLES,
   RATE_LIMIT_VARIABLES,
   getStartupErrors,
   parseBooleanFlag,
   parseClientOrigins,
   parseDebugClientIp,
+  parseMailConfig,
   parseTrustCfConnectingIp,
   parseTrustProxy,
 };
