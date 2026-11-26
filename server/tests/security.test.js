@@ -13,7 +13,7 @@ const { createApp } = require('../src/app');
 const AuditLog = require('../src/models/AuditLog');
 const User = require('../src/models/User');
 const { hashPassword } = require('../src/auth/password');
-const { createLimiters, DEFAULTS } = require('../src/security/rateLimit');
+const { clientKeyGenerator, createLimiters, DEFAULTS } = require('../src/security/rateLimit');
 
 const PASSWORD = 'a-long-password';
 const ALLOWED = 'https://clinicdesk.vercel.app';
@@ -330,6 +330,181 @@ describe('rate limits', () => {
       // A client cannot dodge the limit by sending a new X-Forwarded-For.
       expect((await fromIp(app, '203.0.113.2')).status).toBe(429);
     });
+  });
+});
+
+describe('rate-limit client key (CF-Connecting-IP)', () => {
+  // Failed logins with a limit of 3: the 4th attempt from the same key is a 429.
+  const MAX = 3;
+  const attempt = (app, headers = {}) =>
+    request(app)
+      .post('/api/v1/auth/login')
+      .set(headers)
+      .send({ email: 'mara@example.com', password: 'wrong-password' });
+  const cfApp = (env = {}) =>
+    appWith({
+      env: { TRUST_PROXY: '1', ...env },
+      rateLimit: { enabled: true, trustCfConnectingIp: true, login: { max: MAX } },
+    });
+
+  beforeEach(async () => {
+    await createUser();
+    // express-rate-limit warns (console.error) about X-Forwarded-For without trust proxy.
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it.each(['1', '2'])(
+    'ignores a client-sent X-Forwarded-For and limits one CF-Connecting-IP (TRUST_PROXY=%s)',
+    async (trustProxy) => {
+      const app = cfApp({ TRUST_PROXY: trustProxy });
+      const statuses = [];
+
+      for (let index = 1; index <= MAX + 2; index += 1) {
+        const response = await attempt(app, {
+          'X-Forwarded-For': `198.51.100.${index}, 192.0.2.${index}`,
+          'CF-Connecting-IP': '203.0.113.7',
+        });
+        statuses.push(response.status);
+      }
+
+      expect(statuses).toEqual([401, 401, 401, 429, 429]);
+    },
+  );
+
+  it('answers the usual 429 shape', async () => {
+    const app = cfApp();
+    for (let index = 0; index < MAX; index += 1) {
+      await attempt(app, { 'CF-Connecting-IP': '203.0.113.7' });
+    }
+
+    const limited = await attempt(app, { 'CF-Connecting-IP': '203.0.113.7' });
+
+    expect(limited.status).toBe(429);
+    expect(limited.body).toEqual({
+      error: { code: 'RATE_LIMITED', message: 'Too many login attempts. Try again in 15 minutes.' },
+    });
+    expect(Number(limited.headers['retry-after'])).toBeGreaterThan(0);
+  });
+
+  it('keeps a separate counter per CF-Connecting-IP', async () => {
+    const app = cfApp();
+    for (let index = 0; index < MAX; index += 1) {
+      await attempt(app, { 'CF-Connecting-IP': '203.0.113.7' });
+    }
+
+    expect((await attempt(app, { 'CF-Connecting-IP': '203.0.113.7' })).status).toBe(429);
+    expect((await attempt(app, { 'CF-Connecting-IP': '203.0.113.8' })).status).toBe(401);
+  });
+
+  it('shares one counter for IPv6 addresses in the same /64', async () => {
+    const app = cfApp();
+    const sameNetwork = ['2001:db8:1:2::1', '2001:db8:1:2::2', '2001:db8:1:2:ffff:ffff:ffff:fffe'];
+    for (const ip of sameNetwork) {
+      expect((await attempt(app, { 'CF-Connecting-IP': ip })).status).toBe(401);
+    }
+
+    expect((await attempt(app, { 'CF-Connecting-IP': '2001:db8:1:2:abcd::9' })).status).toBe(429);
+    // Another /56 is another client.
+    expect((await attempt(app, { 'CF-Connecting-IP': '2001:db8:1:300::1' })).status).toBe(401);
+  });
+
+  it('falls back to req.ip when the header is missing or not a bare IP address', async () => {
+    const app = cfApp();
+    const invalid = [
+      {},
+      { 'CF-Connecting-IP': 'not-an-ip' },
+      { 'CF-Connecting-IP': '203.0.113.7, 203.0.113.8' },
+      { 'CF-Connecting-IP': '203.0.113.7:443' },
+    ];
+    for (const headers of invalid.slice(0, MAX)) {
+      expect((await attempt(app, headers)).status).toBe(401);
+    }
+
+    // All of them were counted against req.ip, and a valid header is still its own client.
+    expect((await attempt(app, invalid[MAX])).status).toBe(429);
+    expect((await attempt(app, { 'CF-Connecting-IP': '203.0.113.7' })).status).toBe(401);
+  });
+
+  it('falls back to req.ip from X-Forwarded-For and TRUST_PROXY', async () => {
+    const app = cfApp();
+    for (let index = 0; index < MAX; index += 1) {
+      await attempt(app, { 'X-Forwarded-For': '198.51.100.1', 'CF-Connecting-IP': 'garbage' });
+    }
+
+    expect((await attempt(app, { 'X-Forwarded-For': '198.51.100.1' })).status).toBe(429);
+    expect((await attempt(app, { 'X-Forwarded-For': '198.51.100.2' })).status).toBe(401);
+  });
+
+  it.each([
+    ['unset', {}],
+    ['"false"', { TRUST_CF_CONNECTING_IP: 'false' }],
+  ])('ignores the header completely when TRUST_CF_CONNECTING_IP is %s', async (_label, env) => {
+    const app = createApp({
+      env: { NODE_ENV: 'test', ...env },
+      rateLimit: { enabled: true, login: { max: MAX } },
+    });
+    for (let index = 1; index <= MAX; index += 1) {
+      expect((await attempt(app, { 'CF-Connecting-IP': `203.0.113.${index}` })).status).toBe(401);
+    }
+
+    // A new CF-Connecting-IP does not give a fresh counter.
+    expect((await attempt(app, { 'CF-Connecting-IP': '203.0.113.99' })).status).toBe(429);
+  });
+
+  it('reads TRUST_CF_CONNECTING_IP=true from env', async () => {
+    const app = createApp({
+      env: { NODE_ENV: 'test', TRUST_CF_CONNECTING_IP: 'true' },
+      rateLimit: { enabled: true, login: { max: 1 } },
+    });
+
+    expect((await attempt(app, { 'CF-Connecting-IP': '203.0.113.1' })).status).toBe(401);
+    expect((await attempt(app, { 'CF-Connecting-IP': '203.0.113.1' })).status).toBe(429);
+    expect((await attempt(app, { 'CF-Connecting-IP': '203.0.113.2' })).status).toBe(401);
+  });
+
+  it('applies the same key to the register and global limiters', async () => {
+    const app = appWith({
+      rateLimit: {
+        enabled: true,
+        trustCfConnectingIp: true,
+        register: { max: 1 },
+        global: { max: 1 },
+      },
+    });
+    const hello = (ip) => request(app).get('/api/v1/hello').set('CF-Connecting-IP', ip);
+
+    expect((await hello('203.0.113.1')).status).toBe(200);
+    expect((await hello('203.0.113.1')).status).toBe(429);
+    expect((await hello('203.0.113.2')).status).toBe(200);
+  });
+});
+
+describe('clientKeyGenerator', () => {
+  const fakeRequest = (ip, headers = {}) => ({
+    ip,
+    get: (name) => headers[name.toLowerCase()],
+  });
+
+  it('uses CF-Connecting-IP only when trusted and valid', () => {
+    const trusted = clientKeyGenerator(true);
+    const untrusted = clientKeyGenerator(false);
+    const withHeader = fakeRequest('10.0.0.1', { 'cf-connecting-ip': ' 203.0.113.7 ' });
+
+    expect(trusted(withHeader)).toBe('203.0.113.7');
+    expect(untrusted(withHeader)).toBe('10.0.0.1');
+    expect(trusted(fakeRequest('10.0.0.1', { 'cf-connecting-ip': 'nope' }))).toBe('10.0.0.1');
+    expect(trusted(fakeRequest('10.0.0.1'))).toBe('10.0.0.1');
+  });
+
+  it('reduces IPv6 to its /56 network and IPv4-mapped IPv6 to IPv4', () => {
+    const trusted = clientKeyGenerator(true);
+
+    const keyOf = (ip) => trusted(fakeRequest('10.0.0.1', { 'cf-connecting-ip': ip }));
+
+    expect(keyOf('2001:db8:1:2::1')).toBe('2001:db8:1::/56');
+    expect(keyOf('2001:db8:1:ff:ffff::1')).toBe('2001:db8:1::/56');
+    expect(keyOf('2001:db8:1:100::1')).toBe('2001:db8:1:100::/56');
+    expect(trusted(fakeRequest('::ffff:127.0.0.1'))).toBe('127.0.0.1');
   });
 });
 

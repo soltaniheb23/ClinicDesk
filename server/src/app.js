@@ -1,6 +1,6 @@
 const express = require('express');
 const helmet = require('helmet');
-const { parseClientOrigins, parseTrustProxy } = require('./config');
+const { parseClientOrigins, parseTrustCfConnectingIp, parseTrustProxy } = require('./config');
 const auditLogsRouter = require('./routes/auditLogs');
 const authRouter = require('./routes/auth');
 const ticketsRouter = require('./routes/tickets');
@@ -36,7 +36,11 @@ function corsAllowlist(allowedOrigins) {
 // (src/security/rateLimit.js): tests use it for small limits and fresh counters.
 function createApp({ env = process.env, rateLimit = {} } = {}) {
   const app = express();
-  const { loginLimiter, registerLimiter, globalLimiter } = createLimiters({ env, ...rateLimit });
+  const { loginLimiter, registerLimiter, globalLimiter } = createLimiters({
+    env,
+    trustCfConnectingIp: parseTrustCfConnectingIp(env) === true,
+    ...rateLimit,
+  });
 
   // Security headers on every response, errors and 404s included, so it comes first. The
   // API only ever returns JSON, so the CSP allows nothing to load and nothing to frame it.
@@ -55,6 +59,8 @@ function createApp({ env = process.env, rateLimit = {} } = {}) {
   // and all users would share one rate-limit counter. Trusting more hops than really exist
   // would let clients choose their own IP, so the value is a hop count (config.js).
   app.set('trust proxy', parseTrustProxy(env) ?? false);
+  // Behind Cloudflare (Render), the rate limiters key on CF-Connecting-IP instead
+  // (TRUST_CF_CONNECTING_IP, src/security/rateLimit.js). req.ip is still the fallback.
 
   app.use(corsAllowlist(new Set(parseClientOrigins(env.CLIENT_ORIGIN))));
 

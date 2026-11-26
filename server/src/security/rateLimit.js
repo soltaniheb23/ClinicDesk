@@ -3,7 +3,15 @@
 // Counters live in memory, per process. That is enough for ClinicDesk's single Render
 // instance; with several instances each one would count on its own, and a shared store
 // (for example Redis) would be needed.
-const { rateLimit } = require('express-rate-limit');
+//
+// The client key: by default req.ip, which comes from X-Forwarded-For and the TRUST_PROXY
+// hop count (app.js). Behind Cloudflare plus Render's load balancer that hop count is not
+// stable, so req.ip can be a client-sent X-Forwarded-For entry or a proxy address. With
+// TRUST_CF_CONNECTING_IP=true the key is Cloudflare's CF-Connecting-IP instead, which
+// Cloudflare sets to the address that connected to it and overwrites if the client sends it.
+const { isIP } = require('node:net');
+const { ipKeyGenerator, rateLimit } = require('express-rate-limit');
+const { parseTrustCfConnectingIp } = require('../config');
 
 const MINUTE = 60 * 1000;
 
@@ -39,10 +47,25 @@ function retryAfterSeconds(request) {
   return Math.max(1, Math.ceil((resetTime.getTime() - Date.now()) / 1000));
 }
 
-function buildLimiter({ max, windowMs, message }, extra = {}) {
+// Returns the keyGenerator shared by every limiter. ipKeyGenerator keeps IPv4 as is and
+// reduces IPv6 to its /56 network (express-rate-limit's default), so one client cannot rotate
+// through the addresses of its own IPv6 range to get fresh counters.
+function clientKeyGenerator(trustCfConnectingIp) {
+  return function keyGenerator(request) {
+    if (trustCfConnectingIp) {
+      const cfConnectingIp = request.get('cf-connecting-ip')?.trim();
+      // Only a bare IPv4 or IPv6 address; anything else falls back to req.ip.
+      if (cfConnectingIp && isIP(cfConnectingIp)) return ipKeyGenerator(cfConnectingIp);
+    }
+    return ipKeyGenerator(request.ip);
+  };
+}
+
+function buildLimiter({ max, windowMs, message }, keyGenerator, extra = {}) {
   return rateLimit({
     windowMs,
     limit: max,
+    keyGenerator,
     // RateLimit and RateLimit-Policy headers (IETF draft 7); no X-RateLimit-* headers.
     standardHeaders: 'draft-7',
     legacyHeaders: false,
@@ -71,7 +94,16 @@ function passThrough(_request, _response, next) {
 // and `global` arguments (tests use small numbers there).
 // `enabled` defaults to false only when NODE_ENV is "test", so test files that are not about
 // rate limits never share a counter; the rate-limit tests turn it on explicitly.
-function createLimiters({ env = process.env, enabled, login, register, global } = {}) {
+// `trustCfConnectingIp` defaults to TRUST_CF_CONNECTING_IP in `env` (config.js); an invalid
+// value counts as false here, and stops the server at startup.
+function createLimiters({
+  env = process.env,
+  enabled,
+  trustCfConnectingIp,
+  login,
+  register,
+  global,
+} = {}) {
   const isEnabled = enabled ?? env.NODE_ENV !== 'test';
   if (!isEnabled) {
     return { loginLimiter: passThrough, registerLimiter: passThrough, globalLimiter: passThrough };
@@ -83,11 +115,17 @@ function createLimiters({ env = process.env, enabled, login, register, global } 
     ...overrides,
   });
 
+  const keyGenerator = clientKeyGenerator(
+    trustCfConnectingIp ?? parseTrustCfConnectingIp(env) === true,
+  );
+
   return {
-    loginLimiter: buildLimiter(settings('login', login), { skipSuccessfulRequests: true }),
-    registerLimiter: buildLimiter(settings('register', register)),
-    globalLimiter: buildLimiter(settings('global', global)),
+    loginLimiter: buildLimiter(settings('login', login), keyGenerator, {
+      skipSuccessfulRequests: true,
+    }),
+    registerLimiter: buildLimiter(settings('register', register), keyGenerator),
+    globalLimiter: buildLimiter(settings('global', global), keyGenerator),
   };
 }
 
-module.exports = { createLimiters, DEFAULTS };
+module.exports = { clientKeyGenerator, createLimiters, DEFAULTS };
