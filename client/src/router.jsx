@@ -6,6 +6,7 @@ import CreateTicketPage from './pages/CreateTicketPage.jsx';
 import TicketDetailPage from './pages/TicketDetailPage.jsx';
 import HealthCheckPage from './pages/HealthCheckPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
+import MetricsPage from './pages/MetricsPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import TicketsPage from './pages/TicketsPage.jsx';
@@ -41,6 +42,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute roles={['admin']}>
               <AuditLogPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/metrics"
+          element={
+            <ProtectedRoute roles={['admin']}>
+              <MetricsPage />
             </ProtectedRoute>
           }
         />

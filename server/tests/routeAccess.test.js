@@ -136,6 +136,7 @@ const ROUTES = [
     body: () => ({ role: 'agent' }),
   },
   { name: 'GET /audit-logs', method: 'get', path: () => '/api/v1/audit-logs' },
+  { name: 'GET /metrics', method: 'get', path: () => '/api/v1/metrics' },
   { name: 'POST /debug/sentry-test', method: 'post', path: () => '/api/v1/debug/sentry-test' },
 ];
 
@@ -157,6 +158,7 @@ const EXPECTED = {
   'POST /users': { customer: 403, agent: 403, admin: 201 },
   'PATCH /users/:id (role)': { customer: 403, agent: 403, admin: 200 },
   'GET /audit-logs': { customer: 403, agent: 403, admin: 200 },
+  'GET /metrics': { customer: 403, agent: 403, admin: 200 },
   'POST /debug/sentry-test': { customer: 403, agent: 403, admin: 200 },
 };
 

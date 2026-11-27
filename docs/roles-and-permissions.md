@@ -22,8 +22,7 @@ deactivated-user tokens and other customers' tickets) in
 
 ## What each role may do
 
-The metrics dashboard is still planned; its row is the target behaviour. Every other row is
-implemented and tested.
+Every row is implemented and tested.
 
 | Action | Customer | Agent | Admin |
 |---|---|---|---|
@@ -44,7 +43,7 @@ implemented and tested.
 | Manage users: list, create, change role, deactivate ([user management](user-management.md)) | No (403) | No (403) | Yes, except their own account |
 | View audit log ([audit log](audit-log.md), read only, nobody can edit or delete entries) | No (403) | No (403) | Yes |
 | Send a Sentry test error (`POST /debug/sentry-test`, [monitoring](monitoring.md)) | No (403) | No (403) | Yes |
-| View metrics dashboard | No | No | Yes |
+| View team metrics (`GET /metrics`, `/metrics`, [metrics](metrics.md)) | No (403) | No (403) | Yes |
 
 ## SLA data is internal
 
@@ -57,3 +56,12 @@ shows no SLA badge, column or filter to customers. Tested in `server/tests/sla.t
 
 `firstResponseAt` and `resolvedAt` are not SLA data: they are facts the customer already
 sees in the thread and the status, and they stay in the customer's response as before.
+
+## Metrics are admin only
+
+The metrics page (CD-23, [metrics](metrics.md)) shows each agent's open and resolved
+tickets side by side. **Decision: admin only, because the page compares colleagues.** Agents
+get `403` from `GET /api/v1/metrics`, have no **Metrics** link, and are sent to `/tickets`
+if they open `/metrics`. An agent's own workload is already on the ticket list
+(`assignee=me`). Tested in `server/tests/metrics.test.js`, `server/tests/routeAccess.test.js`
+and `client/src/pages/MetricsPage.test.jsx`.
