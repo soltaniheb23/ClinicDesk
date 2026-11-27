@@ -1053,6 +1053,31 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /debug/sentry-test:
+    post:
+      tags: [Admin]
+      summary: Send a test error to Sentry (admin)
+      description: >
+        Admin only. Throws a test error, catches it, reports it to Sentry with the admin's
+        opaque user id and the tag `sentry_test=true`, and answers `{ ok: true }`. The error is
+        handled, so the answer is never a 500. With `SENTRY_DSN` unset (monitoring off) the
+        answer is the same and nothing is sent. No request body. Counts toward the global
+        /api/v1 rate limit. Order of checks: 401 -> 403. See docs/monitoring.md.
+      responses:
+        '200':
+          description: The test error was handled (and reported, when monitoring is on)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+              example: { ok: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
   /metrics/summary:
     get:
       tags: [Admin]
