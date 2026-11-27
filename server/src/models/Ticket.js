@@ -48,6 +48,10 @@ ticketSchema.index({ createdAt: -1 });
 // at ClinicDesk's size (one clinic, thousands of tickets), and a text index can follow later.
 ticketSchema.index({ status: 1, createdAt: -1, _id: -1 });
 ticketSchema.index({ assignee: 1, createdAt: -1, _id: -1 });
+// Metrics (CD-23, docs/metrics.md): "resolved in the range" matches on resolvedAt only. The
+// indexes above all start with another field, so without this one the query reads every
+// ticket. Tickets that are not resolved have resolvedAt null and sit at one end of it.
+ticketSchema.index({ resolvedAt: 1 });
 
 module.exports = mongoose.model('Ticket', ticketSchema);
 module.exports.CATEGORIES = CATEGORIES;
