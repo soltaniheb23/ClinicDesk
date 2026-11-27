@@ -89,6 +89,36 @@ export function addComment(ticketId, { body, internal = false }) {
   return api.post(`/api/v1/tickets/${encodeURIComponent(ticketId)}/comments`, { body, internal });
 }
 
+// Attachments (CD-18, docs/attachments.md). Same access as the ticket.
+
+const attachmentsPath = (ticketId) => `/api/v1/tickets/${encodeURIComponent(ticketId)}/attachments`;
+
+// Returns { items: [{ id, name, type, size, createdAt, uploadedBy }] }, oldest first.
+export function getAttachments(ticketId, { signal } = {}) {
+  return api.get(attachmentsPath(ticketId), { signal });
+}
+
+// Returns { items } with the new attachments. `files` is an array of File objects, sent as
+// multipart/form-data in the field "files". The server decides the type from the content.
+export function uploadAttachments(ticketId, files) {
+  const form = new FormData();
+  for (const file of files) form.append('files', file, file.name);
+  return api.post(attachmentsPath(ticketId), form);
+}
+
+// Resolves with the file as a Blob. The token is in memory, so a plain link cannot carry it:
+// the download goes through the API client with the Authorization header.
+export function downloadAttachment(ticketId, attachmentId) {
+  return api.get(`${attachmentsPath(ticketId)}/${encodeURIComponent(attachmentId)}`, {
+    responseType: 'blob',
+  });
+}
+
+// Resolves with null (204). Uploader or admin only.
+export function deleteAttachment(ticketId, attachmentId) {
+  return api.delete(`${attachmentsPath(ticketId)}/${encodeURIComponent(attachmentId)}`);
+}
+
 // Admin user management (docs/user-management.md). All three are admin only.
 
 const USER_LIST_PARAMS = ['role', 'isActive', 'q'];
