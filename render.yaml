@@ -39,3 +39,8 @@ services:
         sync: false
       - key: APP_URL
         value: https://clinic-desk-sable.vercel.app
+      # Error monitoring (CD-25, docs/monitoring.md). Unset or empty: off. Set the DSN in the
+      # Render dashboard only (sync: false), never in this file. A value that is not an https
+      # URL stops the API at startup.
+      - key: SENTRY_DSN
+        sync: false
