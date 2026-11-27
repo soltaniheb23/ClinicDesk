@@ -17,8 +17,8 @@ const ERROR_SAMPLE_RATE = 1.0;
 // The SDK once initialised, otherwise null (monitoring is off).
 let sdk = null;
 
-// The options passed to Sentry.init. Exported for the tests.
-function sentryOptions(env, dsn) {
+// The options passed to Sentry.init. `sentry` is the SDK. Exported for the tests.
+function sentryOptions(env, dsn, sentry) {
   return {
     dsn,
     environment: env.SENTRY_ENVIRONMENT?.trim() || env.NODE_ENV || 'development',
@@ -45,6 +45,10 @@ function sentryOptions(env, dsn) {
     },
     beforeSend: scrubEvent,
     beforeBreadcrumb: scrubBreadcrumb,
+    // Uncaught exceptions: reported, then the process exits (the SDK's default, as without
+    // Sentry). Unhandled rejections: the SDK's default "warn" would keep the process running,
+    // which Node does not do; "strict" reports them and then exits as before.
+    integrations: [sentry.onUnhandledRejectionIntegration({ mode: 'strict' })],
   };
 }
 
@@ -56,7 +60,7 @@ function initSentry(env = process.env, { sentry } = {}) {
   if (env.NODE_ENV === 'test' && !sentry) return false;
 
   const client = sentry ?? require('@sentry/node');
-  client.init(sentryOptions(env, dsn));
+  client.init(sentryOptions(env, dsn, client));
   sdk = client;
   return true;
 }

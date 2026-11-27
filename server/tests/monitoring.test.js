@@ -11,6 +11,10 @@ jest.mock('@sentry/node', () => {
   return {
     mockScope,
     init: jest.fn(),
+    onUnhandledRejectionIntegration: jest.fn((options) => ({
+      name: 'OnUnhandledRejection',
+      options,
+    })),
     captureException: jest.fn(),
     withScope: jest.fn((callback) => callback(mockScope)),
   };
@@ -95,6 +99,10 @@ describe('initSentry', () => {
       beforeBreadcrumb: scrubBreadcrumb,
     });
     expect(options.tracesSampleRate).toBeUndefined();
+    // Unhandled rejections still end the process after being reported, as without Sentry.
+    expect(options.integrations).toEqual([
+      { name: 'OnUnhandledRejection', options: { mode: 'strict' } },
+    ]);
     expect(options.dataCollection).toMatchObject({
       userInfo: false,
       cookies: false,
@@ -106,10 +114,14 @@ describe('initSentry', () => {
   });
 
   it('uses SENTRY_ENVIRONMENT when set and omits the release without a commit', () => {
-    const options = sentryOptions({ NODE_ENV: 'production', SENTRY_ENVIRONMENT: 'staging' }, DSN);
+    const options = sentryOptions(
+      { NODE_ENV: 'production', SENTRY_ENVIRONMENT: 'staging' },
+      DSN,
+      Sentry,
+    );
     expect(options.environment).toBe('staging');
     expect(options).not.toHaveProperty('release');
-    expect(sentryOptions({}, DSN).environment).toBe('development');
+    expect(sentryOptions({}, DSN, Sentry).environment).toBe('development');
   });
 });
 
