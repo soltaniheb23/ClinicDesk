@@ -48,10 +48,12 @@ describe('TicketDetailPage', () => {
       '/tickets',
     );
     // A customer on an open ticket gets no status or assignment controls; the only other
-    // button is the comment form's.
+    // buttons are the attachment upload (CD-18) and the comment form's.
     expect(await screen.findByText('No comments yet.')).toBeTruthy();
+    expect(await screen.findByText('No attachments yet.')).toBeTruthy();
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
       'Log out',
+      'Upload',
       'Post comment',
     ]);
 

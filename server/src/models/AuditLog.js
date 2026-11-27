@@ -7,6 +7,8 @@ const ACTIONS = Object.freeze([
   'auth.login_failed',
   'ticket.status_changed',
   'ticket.assignee_changed',
+  'ticket.attachment_added',
+  'ticket.attachment_removed',
   'user.created',
   'user.role_changed',
   'user.active_changed',

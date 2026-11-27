@@ -109,6 +109,12 @@ const ROUTES = [
     ticket: true,
     body: () => ({ body: 'Note', internal: true }),
   },
+  {
+    name: 'GET /tickets/:id/attachments',
+    method: 'get',
+    path: (t) => `/api/v1/tickets/${t}/attachments`,
+    ticket: true,
+  },
   { name: 'GET /users/agents', method: 'get', path: () => '/api/v1/users/agents' },
   { name: 'GET /users', method: 'get', path: () => '/api/v1/users' },
   {
@@ -145,6 +151,7 @@ const EXPECTED = {
   'GET /tickets/:id/comments': { customer: 200, agent: 200, admin: 200 },
   'POST /tickets/:id/comments (public)': { customer: 201, agent: 201, admin: 201 },
   'POST /tickets/:id/comments (internal)': { customer: 403, agent: 201, admin: 201 },
+  'GET /tickets/:id/attachments': { customer: 200, agent: 200, admin: 200 },
   'GET /users/agents': { customer: 403, agent: 200, admin: 200 },
   'GET /users': { customer: 403, agent: 403, admin: 200 },
   'POST /users': { customer: 403, agent: 403, admin: 201 },

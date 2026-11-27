@@ -7,6 +7,7 @@ erDiagram
     TICKET ||--o{ COMMENT : has
     USER ||--o{ COMMENT : writes
     TICKET ||--o{ ATTACHMENT : has
+    USER ||--o{ ATTACHMENT : uploads
     USER ||--o{ AUDIT_LOG : performs
 
     USER {
@@ -48,10 +49,10 @@ erDiagram
         ObjectId _id PK
         ObjectId ticket FK
         ObjectId uploadedBy FK
-        string originalName
-        string storedName
-        string mimeType
-        number sizeBytes
+        string name "sanitised original name"
+        string type "detected: png, jpeg or pdf"
+        number size
+        ObjectId gridFsId "GridFS file, never sent"
         date createdAt
     }
     AUDIT_LOG {

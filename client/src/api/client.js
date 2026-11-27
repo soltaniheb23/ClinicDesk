@@ -29,11 +29,21 @@ export function createApiClient({
   getToken = () => null,
   onUnauthorized = () => {},
 } = {}) {
-  async function request(path, { method = 'GET', body, headers = {}, signal } = {}) {
+  // `body` is sent as JSON, or as is when it is FormData (the browser then sets the multipart
+  // Content-Type with its boundary). `responseType: 'blob'` returns the body of a successful
+  // response as a Blob (file downloads); errors are still read as the uniform JSON shape.
+  async function request(
+    path,
+    { method = 'GET', body, headers = {}, signal, responseType = 'json' } = {},
+  ) {
     const token = getToken();
-    const requestHeaders = { Accept: 'application/json', ...headers };
+    const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
+    const requestHeaders = {
+      Accept: responseType === 'blob' ? '*/*' : 'application/json',
+      ...headers,
+    };
 
-    if (body !== undefined) requestHeaders['Content-Type'] = 'application/json';
+    if (body !== undefined && !isForm) requestHeaders['Content-Type'] = 'application/json';
     if (token) requestHeaders.Authorization = `Bearer ${token}`;
 
     let response;
@@ -41,13 +51,15 @@ export function createApiClient({
       response = await fetch(`${baseUrl}${path}`, {
         method,
         headers: requestHeaders,
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: body === undefined || isForm ? body : JSON.stringify(body),
         signal,
       });
     } catch (error) {
       if (error?.name === 'AbortError') throw error;
       throw new ApiError({ status: 0, code: 'NETWORK_ERROR', message: NETWORK_ERROR_MESSAGE });
     }
+
+    if (response.ok && responseType === 'blob') return response.blob();
 
     const data = await readBody(response);
 

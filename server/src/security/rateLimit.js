@@ -22,6 +22,9 @@ const DEFAULTS = Object.freeze({
   register: { max: 5, windowMs: 60 * MINUTE, message: 'Too many accounts created.' },
   // Everything under /api/v1: a soft ceiling against floods and scraping.
   global: { max: 300, windowMs: 15 * MINUTE, message: 'Too many requests.' },
+  // Attachment uploads (CD-18, docs/attachments.md): each request can carry 6 MB, and the
+  // files fill the Atlas quota. No RATE_LIMIT_UPLOAD_* variables: these values only.
+  upload: { max: 20, windowMs: 15 * MINUTE, message: 'Too many uploads.' },
 });
 
 function envNumber(env, name) {
@@ -89,9 +92,10 @@ function passThrough(_request, _response, next) {
   next();
 }
 
-// Returns { loginLimiter, registerLimiter, globalLimiter }. Each call makes fresh counters.
-// Settings come from the defaults, then RATE_LIMIT_* in `env`, then the `login`, `register`
-// and `global` arguments (tests use small numbers there).
+// Returns { loginLimiter, registerLimiter, globalLimiter, uploadLimiter }. Each call makes
+// fresh counters. Settings come from the defaults, then RATE_LIMIT_* in `env`, then the
+// `login`, `register`, `global` and `upload` arguments (tests use small numbers there). The
+// upload limiter has no RATE_LIMIT_* variables: defaults, then the `upload` argument.
 // `enabled` defaults to false only when NODE_ENV is "test", so test files that are not about
 // rate limits never share a counter; the rate-limit tests turn it on explicitly.
 // `trustCfConnectingIp` defaults to TRUST_CF_CONNECTING_IP in `env` (config.js); an invalid
@@ -103,10 +107,16 @@ function createLimiters({
   login,
   register,
   global,
+  upload,
 } = {}) {
   const isEnabled = enabled ?? env.NODE_ENV !== 'test';
   if (!isEnabled) {
-    return { loginLimiter: passThrough, registerLimiter: passThrough, globalLimiter: passThrough };
+    return {
+      loginLimiter: passThrough,
+      registerLimiter: passThrough,
+      globalLimiter: passThrough,
+      uploadLimiter: passThrough,
+    };
   }
 
   const settings = (name, overrides) => ({
@@ -125,6 +135,7 @@ function createLimiters({
     }),
     registerLimiter: buildLimiter(settings('register', register), keyGenerator),
     globalLimiter: buildLimiter(settings('global', global), keyGenerator),
+    uploadLimiter: buildLimiter({ ...DEFAULTS.upload, ...upload }, keyGenerator),
   };
 }
 

@@ -107,3 +107,37 @@ describe('createApiClient', () => {
     });
   });
 });
+
+describe('createApiClient: attachments (CD-18)', () => {
+  it('sends FormData as is, without a JSON Content-Type, with the token', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(201, { items: [] }));
+    const api = createApiClient({ baseUrl: 'https://api.test', getToken: () => 'abc123' });
+    const form = new FormData();
+    form.append('files', new File(['%PDF-1.7'], 'scan.pdf', { type: 'application/pdf' }));
+
+    await api.post('/api/v1/tickets/t1/attachments', form);
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.body).toBe(form);
+    expect(init.headers['Content-Type']).toBeUndefined();
+    expect(init.headers.Authorization).toBe('Bearer abc123');
+  });
+
+  it('returns a Blob for responseType "blob" and reads errors as the uniform shape', async () => {
+    const blob = new Blob(['bytes'], { type: 'application/pdf' });
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, status: 200, blob: () => Promise.resolve(blob) })
+      .mockResolvedValueOnce(
+        jsonResponse(404, { error: { code: 'NOT_FOUND', message: 'Attachment not found' } }),
+      );
+    const api = createApiClient({ baseUrl: '', getToken: () => 'abc123' });
+
+    await expect(api.get('/file', { responseType: 'blob' })).resolves.toBe(blob);
+    expect(fetchMock.mock.calls[0][1].headers.Accept).toBe('*/*');
+    await expect(api.get('/file', { responseType: 'blob' })).rejects.toMatchObject({
+      status: 404,
+      code: 'NOT_FOUND',
+      message: 'Attachment not found',
+    });
+  });
+});

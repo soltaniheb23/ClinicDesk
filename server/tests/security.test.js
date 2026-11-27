@@ -595,6 +595,13 @@ describe('createLimiters', () => {
     expect(DEFAULTS.login).toMatchObject({ max: 10, windowMs: 15 * 60 * 1000 });
     expect(DEFAULTS.register).toMatchObject({ max: 5, windowMs: 60 * 60 * 1000 });
     expect(DEFAULTS.global).toMatchObject({ max: 300, windowMs: 15 * 60 * 1000 });
+    expect(DEFAULTS.upload).toMatchObject({ max: 20, windowMs: 15 * 60 * 1000 });
+  });
+
+  it('has an upload limiter that is off under NODE_ENV=test and ignores RATE_LIMIT_* (CD-18)', () => {
+    expect(createLimiters({ env: { NODE_ENV: 'test' } }).uploadLimiter.name).toBe('passThrough');
+    const on = createLimiters({ env: { NODE_ENV: 'production', RATE_LIMIT_UPLOAD_MAX: 'x' } });
+    expect(on.uploadLimiter.name).not.toBe('passThrough');
   });
 
   it('reads RATE_LIMIT_* from env, and arguments win over env', async () => {
