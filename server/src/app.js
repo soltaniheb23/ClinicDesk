@@ -8,6 +8,7 @@ const {
   parseTrustProxy,
 } = require('./config');
 const { captureError } = require('./monitoring/sentry');
+const attachmentsRouter = require('./routes/attachments');
 const auditLogsRouter = require('./routes/auditLogs');
 const authRouter = require('./routes/auth');
 const debugRouter = require('./routes/debug');
@@ -53,7 +54,7 @@ function createApp({ env = process.env, rateLimit = {}, mailTransport } = {}) {
   const mailConfig = parseMailConfig(env);
   const mailer = createMailer({ config: mailConfig, env, transport: mailTransport });
   app.set('notifier', createNotifier({ mailer, appUrl: mailConfig.appUrl }));
-  const { loginLimiter, registerLimiter, globalLimiter } = createLimiters({
+  const { loginLimiter, registerLimiter, globalLimiter, uploadLimiter } = createLimiters({
     env,
     trustCfConnectingIp: parseTrustCfConnectingIp(env) === true,
     ...rateLimit,
@@ -94,6 +95,8 @@ function createApp({ env = process.env, rateLimit = {}, mailTransport } = {}) {
   app.use('/api/v1', globalLimiter);
   app.post('/api/v1/auth/login', loginLimiter);
   app.post('/api/v1/auth/register', registerLimiter);
+  // Attachment uploads (CD-18): their own limit, before the multipart body is read.
+  app.post('/api/v1/tickets/:ticketId/attachments', uploadLimiter);
 
   // Room for a 5000-character ticket description in multi-byte scripts (up to 4 bytes each).
   app.use(express.json({ limit: '32kb' }));
@@ -103,6 +106,8 @@ function createApp({ env = process.env, rateLimit = {}, mailTransport } = {}) {
   });
 
   app.use('/api/v1/auth', authRouter);
+  // Before the tickets router, so attachment requests are authenticated once (CD-18).
+  app.use('/api/v1/tickets/:ticketId/attachments', attachmentsRouter);
   app.use('/api/v1/tickets', ticketsRouter);
   app.use('/api/v1/users', usersRouter);
   app.use('/api/v1/audit-logs', auditLogsRouter);
