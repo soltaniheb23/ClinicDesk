@@ -5,6 +5,7 @@ const {
   parseClientOrigins,
   parseDebugClientIp,
   parseMailConfig,
+  parseSentryDsn,
   parseTrustCfConnectingIp,
   parseTrustProxy,
   RATE_LIMIT_VARIABLES,
@@ -240,5 +241,38 @@ describe('mail settings (EMAIL_ENABLED)', () => {
       port: undefined,
       appUrl: undefined,
     });
+  });
+});
+
+describe('error monitoring (SENTRY_DSN)', () => {
+  // Made-up DSNs in Sentry's format, never real ones.
+  const DSN = 'https://publickey@o0.ingest.sentry.io/0';
+
+  it('is optional: unset or empty turns monitoring off', () => {
+    expect(getStartupErrors(BASE)).toEqual([]);
+    expect(getStartupErrors({ ...BASE, SENTRY_DSN: '' })).toEqual([]);
+    expect(parseSentryDsn({})).toBeUndefined();
+    expect(parseSentryDsn({ SENTRY_DSN: '   ' })).toBeUndefined();
+  });
+
+  it('accepts an https DSN, trimmed', () => {
+    expect(getStartupErrors({ ...BASE, NODE_ENV: 'production', SENTRY_DSN: DSN })).toEqual([]);
+    expect(parseSentryDsn({ SENTRY_DSN: ` ${DSN} ` })).toBe(DSN);
+    expect(parseSentryDsn({ SENTRY_DSN: 'https://key@o0.ingest.de.sentry.io/1' })).toBe(
+      'https://key@o0.ingest.de.sentry.io/1',
+    );
+  });
+
+  it.each([
+    'http://publickey@o0.ingest.sentry.io/0',
+    'publickey@o0.ingest.sentry.io/0',
+    'not a url',
+    'ftp://o0.ingest.sentry.io/0',
+  ])('stops startup with a clear message for SENTRY_DSN=%j, without printing it', (value) => {
+    const errors = getStartupErrors({ ...BASE, SENTRY_DSN: value });
+
+    expect(errors).toEqual([expect.stringContaining('SENTRY_DSN must be an https URL')]);
+    expect(errors[0]).not.toContain(value);
+    expect(parseSentryDsn({ SENTRY_DSN: value })).toBeNull();
   });
 });
