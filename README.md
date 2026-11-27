@@ -18,9 +18,9 @@ ClinicDesk gives them one place to create, track, and resolve tickets.
 - Audit log of important actions
 
 ## Tech stack
-**In use:** React, React Router, Vite, Node.js, Express, Jest, Supertest, Vitest, ESLint, Prettier, GitHub Actions
+**In use:** React, React Router, Vite, Node.js, Express, Jest, Supertest, Vitest, ESLint, Prettier, GitHub Actions, Sentry (error monitoring, off without a DSN)
 
-**Planned:** MongoDB Atlas data integration, Tailwind CSS, Playwright, Sentry
+**Planned:** MongoDB Atlas data integration, Tailwind CSS, Playwright
 
 ## Getting started
 
@@ -96,6 +96,17 @@ The client and server are deployed separately. Set these environment variables i
 | Vercel (client) | `VITE_API_URL`  | The Render API URL, no trailing slash 	   |
 | Render (server) | `CLIENT_ORIGIN` | The Vercel URL, no trailing slash 		   |
 | Render (server) | `MONGODB_URI` 	| The MongoDB Atlas connection string (secret) |
+| Render (server) | `SENTRY_DSN` | Optional. The DSN of the Sentry Node.js project ([`docs/monitoring.md`](docs/monitoring.md)) |
+| Vercel (client) | `VITE_SENTRY_DSN` | Optional. The DSN of the Sentry React project; needs a rebuild |
+
+## Error monitoring
+
+Unexpected errors (API 5xx, uncaught exceptions and unhandled rejections, client render
+errors) are reported to Sentry when `SENTRY_DSN` (Render) or `VITE_SENTRY_DSN` (Vercel) is
+set. Without them monitoring is off and nothing is sent; tests never send anything. Request
+bodies, cookies, query strings, tokens, emails and ticket text are removed before an event
+leaves the app. Setup, the admin-only test route `POST /api/v1/debug/sentry-test` and the
+client test one-liner are in [`docs/monitoring.md`](docs/monitoring.md).
 
 ## Security
 
@@ -117,6 +128,8 @@ the secret scan and the open findings are in
 | `MAIL_FROM` | none | Sender, for example `ClinicDesk <no-reply@example.com>`. |
 | `APP_URL` | none | The client's http(s) URL, used for the ticket link in emails (for example `https://clinicdesk.vercel.app`). |
 | `JWT_SECRET` | none | At least 32 characters in production. |
+| `SENTRY_DSN` | none (off) | Sentry DSN for error monitoring ([`docs/monitoring.md`](docs/monitoring.md)). Must be an `https://` URL, or the server stops at startup. Set it in the Render dashboard only. |
+| `SENTRY_ENVIRONMENT` | `NODE_ENV` | Optional environment tag in Sentry, for example `staging`. |
 | `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_LOGIN_WINDOW_MS` | 10 per 15 minutes | Failed logins per IP. Successful logins are not counted. |
 | `RATE_LIMIT_REGISTER_MAX`, `RATE_LIMIT_REGISTER_WINDOW_MS` | 5 per hour | Registrations per IP. |
 | `RATE_LIMIT_GLOBAL_MAX`, `RATE_LIMIT_GLOBAL_WINDOW_MS` | 300 per 15 minutes | All `/api/v1` requests per IP (`/health` is never limited). |
@@ -163,7 +176,9 @@ Then delete `DEBUG_CLIENT_IP` on Render again (unset means `false`); it is not i
 The log will be removed once the setup is confirmed.
 
 The client's CSP (`connect-src` in `client/vercel.json`) allows the API at
-`https://clinicdesk-api-2uh0.onrender.com`. When the Render service URL changes,
+`https://clinicdesk-api-2uh0.onrender.com` and Sentry's ingest hosts
+(`https://*.ingest.sentry.io`, `https://*.ingest.de.sentry.io`,
+`https://*.ingest.us.sentry.io`, see [`docs/monitoring.md`](docs/monitoring.md)). When the Render service URL changes,
 `connect-src` in `client/vercel.json` must be changed too, otherwise the browser blocks all
 API calls.
 
@@ -180,6 +195,7 @@ API calls.
 - Admin user management and the first admin: [`docs/user-management.md`](docs/user-management.md)
 - Audit log: [`docs/audit-log.md`](docs/audit-log.md)
 - Security review (OWASP Top 10): [`docs/security-review.md`](docs/security-review.md)
+- Error monitoring with Sentry (what is reported and removed, setup, test errors): [`docs/monitoring.md`](docs/monitoring.md)
 - Email notifications: [`docs/notifications.md`](docs/notifications.md); change request record: [`docs/change-requests/CD-21.md`](docs/change-requests/CD-21.md)
 - SLA timer (targets, states, who sees them): [`docs/sla.md`](docs/sla.md); change request record: [`docs/change-requests/CD-22.md`](docs/change-requests/CD-22.md)
 - Responsive layout and screenshots: [`docs/responsive/`](docs/responsive/README.md)

@@ -3,6 +3,9 @@
 // - connect-src must list the API origin the production build talks to (VITE_API_URL on
 //   Vercel). If the Render URL changes, update connect-src in vercel.json, or every API call
 //   is blocked by the browser.
+// - connect-src also lists Sentry's ingest hosts (CD-25, docs/monitoring.md), and nothing
+//   else: the browser SDK sends error events there when VITE_SENTRY_DSN is set. These three
+//   are the only wildcards allowed anywhere in the policy.
 // - The build only loads its own files: fonts are self-hosted (@fontsource), there are no
 //   inline scripts or styles, so 'unsafe-inline' and 'unsafe-eval' are never needed.
 import { readFileSync } from 'node:fs';
@@ -12,6 +15,13 @@ import { describe, expect, it } from 'vitest';
 // The real Render service URL (VITE_API_URL on Vercel). When the Render service URL
 // changes, change connect-src in client/vercel.json and this constant together.
 const API_ORIGIN = 'https://clinicdesk-api-2uh0.onrender.com';
+
+// Sentry's ingest hosts (CD-25): the DSN's host is o<org>.ingest[.<region>].sentry.io.
+const SENTRY_INGEST_HOSTS = [
+  'https://*.ingest.sentry.io',
+  'https://*.ingest.de.sentry.io',
+  'https://*.ingest.us.sentry.io',
+];
 
 const vercel = JSON.parse(readFileSync(join(import.meta.dirname, '../../vercel.json'), 'utf8'));
 const rule = vercel.headers.find((entry) => entry.source === '/(.*)');
@@ -48,19 +58,24 @@ describe('vercel.json security headers', () => {
     expect(csp['frame-ancestors']).toEqual(["'none'"]);
   });
 
-  it('lets the app call itself and the API origin, nothing else', () => {
-    expect(csp['connect-src']).toEqual(["'self'", API_ORIGIN]);
+  it('lets the app call itself, the API origin and Sentry ingest, nothing else', () => {
+    expect(csp['connect-src']).toEqual(["'self'", API_ORIGIN, ...SENTRY_INGEST_HOSTS]);
   });
 
-  it('allows no wildcard in connect-src (no "*", no scheme-only source)', () => {
+  it('allows no wildcard in connect-src except the Sentry ingest hosts', () => {
     for (const source of csp['connect-src']) {
-      expect(source).not.toContain('*');
       expect(source).not.toMatch(/^[a-z]+:$/);
+      if (SENTRY_INGEST_HOSTS.includes(source)) continue;
+      expect(source).not.toContain('*');
+    }
+    for (const host of SENTRY_INGEST_HOSTS) {
+      expect(host).toMatch(/^https:\/\/\*\.ingest\.([a-z]{2}\.)?sentry\.io$/);
     }
   });
 
   it('never uses wildcards, unsafe-inline, unsafe-eval or third-party font hosts', () => {
-    const policy = headers['Content-Security-Policy'];
+    let policy = headers['Content-Security-Policy'];
+    for (const host of SENTRY_INGEST_HOSTS) policy = policy.replace(` ${host}`, '');
     expect(policy).not.toMatch(/\*|unsafe-inline|unsafe-eval|data:|fonts\.(googleapis|gstatic)/);
   });
 });

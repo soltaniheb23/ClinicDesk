@@ -41,6 +41,7 @@ behaviour. Every other row is implemented and tested.
 | Assign or claim a ticket ([assignment](assignment.md)) | No | Claim, or release own | Any active agent or admin |
 | Manage users: list, create, change role, deactivate ([user management](user-management.md)) | No (403) | No (403) | Yes, except their own account |
 | View audit log ([audit log](audit-log.md), read only, nobody can edit or delete entries) | No (403) | No (403) | Yes |
+| Send a Sentry test error (`POST /debug/sentry-test`, [monitoring](monitoring.md)) | No (403) | No (403) | Yes |
 | View metrics dashboard | No | No | Yes |
 
 ## SLA data is internal

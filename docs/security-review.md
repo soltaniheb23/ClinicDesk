@@ -20,8 +20,8 @@ The status is one of:
 | A06 | Vulnerable and Outdated Components | finding | `npm audit`: client 0; server production dependencies 0. Server dev dependencies: 19 moderate, 0 high, 0 critical (see below). Lockfiles are used with `npm ci` in CI. | Dev toolchain advisories and dependency automation (T5) |
 | A07 | Identification and Authentication Failures | ok, and fixed in this PR | Password 8 characters to 72 bytes. bcrypt compares against a dummy hash for unknown emails, so both failures take a similar time. The role and active state are read from the database on every request, so deactivation applies at once. **New:** failed logins are rate limited. **New (fix):** the login limit really triggers on Render: before, a different `X-Forwarded-For` on each attempt gave a fresh counter (see "Rate-limit client key"). | No password change or reset; admin-set temporary passwords never expire (T1). No MFA for admins (T7). |
 | A08 | Software and Data Integrity Failures | ok | `package-lock.json` plus `npm ci`. JWTs are signed and the algorithm is pinned. CI runs with `permissions: contents: read`. The audit log is append-only (`docs/audit-log.md`). | GitHub Actions pinned to tags, not commit SHAs (T6) |
-| A09 | Security Logging and Monitoring Failures | ok, with findings | The audit log records logins (including failures), status, assignment and user changes (CD-20). **New:** a rate-limited request (429) writes no audit entry (`security.test.js`), so the limiter also caps how fast an attacker can fill the log. | No retention for the audit log (T8). No alerting on failed-login bursts (part of T3). |
-| A10 | Server-Side Request Forgery | ok | The server makes no outbound HTTP requests. There is no URL input and no webhooks; its only connection is to MongoDB, from `MONGODB_URI`. | None |
+| A09 | Security Logging and Monitoring Failures | ok, with findings | The audit log records logins (including failures), status, assignment and user changes (CD-20). **New:** a rate-limited request (429) writes no audit entry (`security.test.js`), so the limiter also caps how fast an attacker can fill the log. **CD-25:** unexpected errors (5xx, uncaught exceptions, client render errors) are reported to Sentry when a DSN is set, scrubbed of personal data (see "Third-party processor: Sentry"). | No retention for the audit log (T8). No alerting on failed-login bursts (part of T3). |
+| A10 | Server-Side Request Forgery | ok | There is no URL input and no webhooks. The server connects to MongoDB (`MONGODB_URI`), to the SMTP server when email is on (CD-21), and to Sentry's ingest host when `SENTRY_DSN` is set (CD-25). All three come from configuration, never from a request. | None |
 
 ## What CD-24 changed
 
@@ -62,7 +62,8 @@ The status is one of:
   off camera, microphone, geolocation, payment and USB.
 - CSP: `default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src
   'self'; connect-src 'self' https://clinicdesk-api-2uh0.onrender.com; object-src 'none';
-  base-uri 'self'; form-action 'self'; frame-ancestors 'none'`.
+  base-uri 'self'; form-action 'self'; frame-ancestors 'none'`. (CD-25 later added the Sentry
+  ingest hosts to `connect-src` only; see "Third-party processor: Sentry".)
   - Fonts are self-hosted with `@fontsource`. No Google Fonts hosts are needed.
   - The build has no inline scripts, inline styles or `data:` URLs.
   - **`connect-src` must list the production API origin** (`VITE_API_URL` on Vercel), today
@@ -80,6 +81,45 @@ The status is one of:
   - A build pointing at another API origin was blocked under this policy (1 `connect-src`
     report, and the page shows "Could not reach the ClinicDesk API"). It worked once that
     origin was added to `connect-src`.
+
+## Third-party processor: Sentry (CD-25)
+
+Sentry receives error reports from the API and the client when `SENTRY_DSN` (Render) or
+`VITE_SENTRY_DSN` (Vercel) is set. It is a third-party processor and has to be listed as one
+in the clinic's records of processing. Choose the EU data region
+(`*.ingest.de.sentry.io`). Details: [monitoring](monitoring.md).
+
+- **Off by default.** Without a DSN the SDK is never initialised and makes no network call.
+  The test suites never initialise it (a mock is injected where needed).
+- **What Sentry receives:** the error type, message and stack trace (with emails, bearer
+  tokens and JWTs in the message replaced), the URL path without its query string, the HTTP
+  method, the browser's user agent (client events), the environment and release tags, the SDK's runtime context, and the
+  **opaque user id** of a logged-in caller.
+- **What Sentry never receives:** request or response bodies, cookies, query strings, the
+  `Authorization` header, passwords, tokens, secrets, email addresses, any user field other
+  than the id (name, username, IP address), ticket titles, descriptions, comment bodies and internal notes, form input, local
+  variables, and database query data. `sendDefaultPii` is `false`, and every SDK v11
+  `dataCollection` category is off. On top of that, one tested scrub function per side
+  (`server/src/monitoring/scrub.js`, `client/src/monitoring/scrub.js`) runs as `beforeSend` and
+  `beforeBreadcrumb` and removes these fields again. No tracing and no session replay.
+- **Only unexpected errors.** The API reports only the 500 branch of its error handler, plus
+  uncaught exceptions and unhandled rejections. 4xx answers are never reported, so failed
+  logins, 403s and 404s for other customers' tickets do not reach Sentry. The answers
+  themselves did not change.
+- **Startup check:** `SENTRY_DSN` must be an `https://` URL, or the API refuses to start. The
+  value is never printed.
+- **Test route:** `POST /api/v1/debug/sentry-test` is admin only, rate limited by the global
+  limiter, and listed in [roles and permissions](roles-and-permissions.md) and in
+  `routeAccess.test.js`.
+- **Client CSP:** `connect-src` additionally allows `https://*.ingest.sentry.io`,
+  `https://*.ingest.de.sentry.io` and `https://*.ingest.us.sentry.io`. Without them the browser
+  would silently block every event, the same class of failure as the CD-24 API URL incident.
+  No other directive changed, and these are the only wildcards in the policy
+  (`vercelHeaders.test.js`).
+- **Residual risk:** the browser DSN is public (it is in the bundle), so anyone can send fake
+  events. Allowed Domains and rate limits in the Sentry project contain this, and it cannot
+  read data. The scrubber matches field names and text patterns: a new personal field under
+  an unusual name must be added to both scrub files.
 
 ## Rate-limit client key
 

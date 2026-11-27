@@ -1,5 +1,9 @@
 require('dotenv').config();
 
+// Error monitoring first, before Express and the routes are loaded (CD-25,
+// docs/monitoring.md). Does nothing without SENTRY_DSN; an invalid one stops startup below.
+require('./monitoring/sentry').initSentry(process.env);
+
 const crypto = require('node:crypto');
 const app = require('./app');
 const { getStartupErrors } = require('./config');

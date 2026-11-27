@@ -151,6 +151,20 @@ function getMailErrors(env) {
   return errors;
 }
 
+// SENTRY_DSN (CD-25, docs/monitoring.md). Unset or empty: undefined (error monitoring is
+// off). An https URL: the trimmed value. Anything else is null (a startup error), so a typo
+// never leaves monitoring silently off or sends events over plain http.
+function parseSentryDsn(env) {
+  const value = env.SENTRY_DSN?.trim();
+  if (value === undefined || value === '') return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 function isPositiveInteger(value) {
   return /^[1-9]\d*$/.test(String(value).trim());
 }
@@ -203,6 +217,13 @@ function getStartupErrors(env) {
 
   errors.push(...getMailErrors(env));
 
+  if (parseSentryDsn(env) === null) {
+    // The value is not printed: a DSN is not a password, but it should not end up in logs.
+    errors.push(
+      'SENTRY_DSN must be an https URL, the DSN from Sentry (Project Settings > Client Keys), for example https://<key>@o0.ingest.sentry.io/0. Leave it empty to turn error monitoring off.',
+    );
+  }
+
   for (const name of RATE_LIMIT_VARIABLES) {
     if (env[name] !== undefined && env[name] !== '' && !isPositiveInteger(env[name])) {
       errors.push(`${name} must be a whole number greater than 0.`);
@@ -221,6 +242,7 @@ module.exports = {
   parseClientOrigins,
   parseDebugClientIp,
   parseMailConfig,
+  parseSentryDsn,
   parseTrustCfConnectingIp,
   parseTrustProxy,
 };
