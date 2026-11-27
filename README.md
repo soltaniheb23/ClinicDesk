@@ -134,6 +134,9 @@ the secret scan and the open findings are in
 | `RATE_LIMIT_REGISTER_MAX`, `RATE_LIMIT_REGISTER_WINDOW_MS` | 5 per hour | Registrations per IP. |
 | `RATE_LIMIT_GLOBAL_MAX`, `RATE_LIMIT_GLOBAL_WINDOW_MS` | 300 per 15 minutes | All `/api/v1` requests per IP (`/health` is never limited). |
 
+Attachment uploads have their own limit of 20 per 15 minutes per IP, with no `RATE_LIMIT_*`
+variable ([`docs/attachments.md`](docs/attachments.md)).
+
 Limited requests get `429 RATE_LIMITED` with a `Retry-After` header. The counters are kept in
 memory, which suits the single Render instance. The limits are off when `NODE_ENV=test`.
 
@@ -195,6 +198,7 @@ API calls.
 - Admin user management and the first admin: [`docs/user-management.md`](docs/user-management.md)
 - Audit log: [`docs/audit-log.md`](docs/audit-log.md)
 - Security review (OWASP Top 10): [`docs/security-review.md`](docs/security-review.md)
+- File attachments (limits, type detection, storage, access, headers): [`docs/attachments.md`](docs/attachments.md); storage decision: [`docs/decisions/CD-18-attachment-storage.md`](docs/decisions/CD-18-attachment-storage.md)
 - Error monitoring with Sentry (what is reported and removed, setup, test errors): [`docs/monitoring.md`](docs/monitoring.md)
 - Email notifications: [`docs/notifications.md`](docs/notifications.md); change request record: [`docs/change-requests/CD-21.md`](docs/change-requests/CD-21.md)
 - SLA timer (targets, states, who sees them): [`docs/sla.md`](docs/sla.md); change request record: [`docs/change-requests/CD-22.md`](docs/change-requests/CD-22.md)

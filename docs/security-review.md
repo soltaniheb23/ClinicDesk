@@ -15,7 +15,7 @@ The status is one of:
 | A01 | Broken Access Control | ok | `requireRole` and `canAccessOwnedResource` (`server/src/auth/authorize.js`). Customers get 404 for other customers' tickets. Admin-only user and audit routes. Every protected route is tested against every role in `server/tests/routeAccess.test.js`. | None |
 | A02 | Cryptographic Failures | ok, and fixed in this PR | bcrypt with 12 rounds (`server/src/auth/password.js`). JWT verification pinned to `HS256` (`authenticate.js`). **New:** in production, `JWT_SECRET` must be at least 32 characters (`config.js`, `config.test.js`). **New:** HSTS on every API response (helmet, `security.test.js`). | Session token in `sessionStorage` (T4) |
 | A03 | Injection | ok, and fixed in this PR | Every body and query is validated with zod. Unknown or operator-style query keys (`role[$ne]`) are a 400. Searches are escaped literals (`queryParams.js`). React escapes output, and there is no `dangerouslySetInnerHTML` or `eval`. **New:** a strict CSP on the API (`default-src 'none'`) and on the client (`'self'` only, no `unsafe-inline`; `client/vercel.json`, `vercelHeaders.test.js`). | None |
-| A04 | Insecure Design | fixed in this PR | **New:** rate limits on login (failed attempts), register, and the whole API (`server/src/security/rateLimit.js`, `security.test.js`). **New (fix):** behind Cloudflare the limiters key on `CF-Connecting-IP` (`TRUST_CF_CONNECTING_IP=true`), not on a client-controlled `X-Forwarded-For` entry; IPv6 is counted per /56 (see "Rate-limit client key"). Last-admin and self-change safeguards (`docs/user-management.md`). Same answer for an unknown email, a wrong password and a deactivated account. | Per-account login throttling (T3); shared limiter store before scaling (T2) |
+| A04 | Insecure Design | fixed in this PR | **New:** rate limits on login (failed attempts), register, and the whole API (`server/src/security/rateLimit.js`, `security.test.js`). **CD-18:** file uploads are limited by size, count and their own rate limit, and checked by content (see "File uploads"). **New (fix):** behind Cloudflare the limiters key on `CF-Connecting-IP` (`TRUST_CF_CONNECTING_IP=true`), not on a client-controlled `X-Forwarded-For` entry; IPv6 is counted per /56 (see "Rate-limit client key"). Last-admin and self-change safeguards (`docs/user-management.md`). Same answer for an unknown email, a wrong password and a deactivated account. | Per-account login throttling (T3); shared limiter store before scaling (T2) |
 | A05 | Security Misconfiguration | fixed in this PR | **New:** helmet on every response, including 404s and errors. **New:** CORS exact-match allowlist, with `*` refused at startup. **New:** JSON 404 instead of Express's HTML page; no `X-Powered-By`. **New:** startup checks for `CLIENT_ORIGIN`, `TRUST_PROXY` and `RATE_LIMIT_*`. **New:** client headers (`nosniff`, `DENY`, `Referrer-Policy`, `Permissions-Policy`). 500s never include error details. | None |
 | A06 | Vulnerable and Outdated Components | finding | `npm audit`: client 0; server production dependencies 0. Server dev dependencies: 19 moderate, 0 high, 0 critical (see below). Lockfiles are used with `npm ci` in CI. | Dev toolchain advisories and dependency automation (T5) |
 | A07 | Identification and Authentication Failures | ok, and fixed in this PR | Password 8 characters to 72 bytes. bcrypt compares against a dummy hash for unknown emails, so both failures take a similar time. The role and active state are read from the database on every request, so deactivation applies at once. **New:** failed logins are rate limited. **New (fix):** the login limit really triggers on Render: before, a different `X-Forwarded-For` on each attempt gave a fresh counter (see "Rate-limit client key"). | No password change or reset; admin-set temporary passwords never expire (T1). No MFA for admins (T7). |
@@ -81,6 +81,27 @@ The status is one of:
   - A build pointing at another API origin was blocked under this policy (1 `connect-src`
     report, and the page shows "Could not reach the ClinicDesk API"). It worked once that
     origin was added to `connect-src`.
+
+## File uploads (CD-18)
+
+Attachments ([attachments](attachments.md), decision:
+[GridFS storage](decisions/CD-18-attachment-storage.md)) add the classic upload risks. Each
+one and what handles it:
+
+| Risk | Mitigation | Test |
+|---|---|---|
+| Executable or script uploaded and run (web shell, HTML/SVG with script) | Only PNG, JPEG and PDF, decided by **magic bytes**, never by the client's Content-Type or extension. HTML, SVG, executables and empty files are refused. Files are never written to disk or a static path, so nothing can be executed or served by a web server. | `attachmentHelpers.test.js`, `attachments.test.js` ("rejects …", "no file is ever written to disk") |
+| File served inline and rendered by the browser (stored XSS, content sniffing) | Downloads only: `Content-Disposition: attachment`, `Content-Type` = the detected type, `X-Content-Type-Options: nosniff`, and helmet's `default-src 'none'` CSP. No image previews in the client. | `attachments.test.js` (download headers) |
+| Path traversal or overwrite through the filename | The name is only metadata: basename only, control and bidi characters removed, no leading dots, at most 100 characters, extension forced to match the detected type. GridFS files are named with a random UUID. | `attachmentHelpers.test.js` (sanitiser), `attachments.test.js` (GridFS names) |
+| Reading other customers' files (IDOR) | Every route uses the ticket's access rule: another customer's ticket is the same `404` as an unknown one, and an attachment id is only looked up within its ticket. No public URL exists. | `attachments.test.js`, `routeAccess.test.js` |
+| Deleting other people's files | Uploader or admin only; agents only their own. | `attachments.test.js` (delete) |
+| Denial of service: huge bodies, many files, quota exhaustion | multer memory storage with `fileSize` 2 MB (reading stops past it), 3 files per request, 5 per ticket, a dedicated upload rate limit (20 per 15 minutes per client) on top of the global one. Atlas M0's 512 MB quota is the remaining risk (see the decision record). | `attachments.test.js` (413, counts, 429), `security.test.js` |
+| Cached copies of private files | `Cache-Control: private, no-store`. | `attachments.test.js` |
+| Vulnerable upload parser | multer 2.5.0 (busboy 1.6), the current release. `npm audit --omit=dev`: 0 vulnerabilities. | |
+
+**Residual risks** (in [attachments](attachments.md#known-limits)): no virus scanning; a
+PDF can still carry harmful content for the user's PDF reader; JPEG EXIF metadata (GPS) is
+kept; a narrow race can exceed 5 files per ticket; the M0 storage quota.
 
 ## Third-party processor: Sentry (CD-25)
 

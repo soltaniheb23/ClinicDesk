@@ -25,6 +25,8 @@ which is itself the event being recorded.
 | `auth.login_failed` | `POST /auth/login` answers 401 (wrong password, unknown email or deactivated account) | `null` | user, `entityId: null` | `{ email }`: the attempted email, lowercase, at most 254 characters |
 | `ticket.status_changed` | `PATCH /tickets/{id}/status` succeeds | who changed it | ticket | `{ from, to }`: status values, for example `open` and `in_progress` |
 | `ticket.assignee_changed` | `PATCH /tickets/{id}/assignee` succeeds | who changed it | ticket | `{ from, to }`: each is `{ id, name }` or `null` (unassigned). The names are kept as they were at that moment. |
+| `ticket.attachment_added` | `POST /tickets/{id}/attachments` stores a file (one entry per file) | the uploader | ticket | `{ name }`: the sanitised filename ([attachments](attachments.md)) |
+| `ticket.attachment_removed` | `DELETE /tickets/{id}/attachments/{attachmentId}` succeeds | who deleted it | ticket | `{ name }`: the filename |
 | `user.created` | `POST /users` succeeds | the admin | the new user | `{ role }` |
 | `user.role_changed` | `PATCH /users/{id}` changes the role | the admin | the user | `{ from, to }`: role values |
 | `user.active_changed` | `PATCH /users/{id}` deactivates or reactivates | the admin | the user | `{ from, to }`: `true` or `false` |

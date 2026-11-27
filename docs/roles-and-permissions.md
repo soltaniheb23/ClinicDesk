@@ -22,8 +22,8 @@ deactivated-user tokens and other customers' tickets) in
 
 ## What each role may do
 
-Attachments and the metrics dashboard are still planned; their rows are the target
-behaviour. Every other row is implemented and tested.
+The metrics dashboard is still planned; its row is the target behaviour. Every other row is
+implemented and tested.
 
 | Action | Customer | Agent | Admin |
 |---|---|---|---|
@@ -36,7 +36,9 @@ behaviour. Every other row is implemented and tested.
 | Filter the list by SLA (`sla=breached`, `sla=at_risk`) | No (403) | Yes | Yes |
 | Comment on a ticket ([comments](comments.md)) | Own tickets, not closed | All, not closed | All, not closed |
 | Write and read internal notes | No (403, never returned) | Yes | Yes |
-| Upload and download attachments | Own tickets | All | All |
+| List and download attachments ([attachments](attachments.md)) | Own tickets | All | All |
+| Upload attachments (PNG, JPEG, PDF; 2 MB, 3 per upload, 5 per ticket) | Own tickets, not closed | All, not closed | All, not closed |
+| Delete an attachment | Files they uploaded | Files they uploaded | Any file |
 | Change ticket status ([workflow](status-workflow.md)) | Close own resolved ticket | Yes | Yes |
 | Assign or claim a ticket ([assignment](assignment.md)) | No | Claim, or release own | Any active agent or admin |
 | Manage users: list, create, change role, deactivate ([user management](user-management.md)) | No (403) | No (403) | Yes, except their own account |
