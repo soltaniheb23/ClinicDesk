@@ -12,6 +12,7 @@ const attachmentsRouter = require('./routes/attachments');
 const auditLogsRouter = require('./routes/auditLogs');
 const authRouter = require('./routes/auth');
 const debugRouter = require('./routes/debug');
+const metricsRouter = require('./routes/metrics');
 const ticketsRouter = require('./routes/tickets');
 const usersRouter = require('./routes/users');
 const { createMailer } = require('./notifications/mailer');
@@ -46,8 +47,15 @@ function corsAllowlist(allowedOrigins) {
 // Builds the API. `env` is read once, here. `rateLimit` is passed to createLimiters
 // (src/security/rateLimit.js): tests use it for small limits and fresh counters.
 // `mailTransport` replaces the SMTP transport (tests inject a fake; docs/notifications.md).
-function createApp({ env = process.env, rateLimit = {}, mailTransport } = {}) {
+// `clock` returns "now" for the metrics (CD-23); tests pass a fixed time.
+function createApp({
+  env = process.env,
+  rateLimit = {},
+  mailTransport,
+  clock = () => new Date(),
+} = {}) {
   const app = express();
+  app.set('clock', clock);
 
   // Email notifications (CD-21). Off unless EMAIL_ENABLED=true; never sent under
   // NODE_ENV=test without an injected transport. Routes reach it with request.app.get().
@@ -112,6 +120,7 @@ function createApp({ env = process.env, rateLimit = {}, mailTransport } = {}) {
   app.use('/api/v1/users', usersRouter);
   app.use('/api/v1/audit-logs', auditLogsRouter);
   app.use('/api/v1/debug', debugRouter);
+  app.use('/api/v1/metrics', metricsRouter);
 
   // Unknown paths and methods: the uniform error shape, not Express's HTML page.
   app.use((_request, response) => response.status(404).json(NOT_FOUND));

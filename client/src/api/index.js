@@ -146,6 +146,15 @@ export function updateUser(id, changes) {
   return api.patch(`/api/v1/users/${encodeURIComponent(id)}`, changes);
 }
 
+// Team metrics (CD-23, docs/metrics.md), admin only. `range` is 7d, 30d, 90d or all.
+// Returns { range, from, generatedAt, openTickets, resolution, perAgent, unassigned, sla }.
+export function getMetrics({ range, signal } = {}) {
+  const query = new URLSearchParams();
+  if (range) query.set('range', range);
+  const suffix = query.toString() ? `?${query}` : '';
+  return api.get(`/api/v1/metrics${suffix}`, { signal });
+}
+
 const AUDIT_LOG_PARAMS = ['action', 'actor', 'entityType', 'from', 'to'];
 
 // Returns { items, page, limit, total, totalPages }, newest first (admin only,
