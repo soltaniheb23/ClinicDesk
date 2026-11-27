@@ -7,6 +7,8 @@ export const ACTION_LABELS = {
   'auth.login_failed': 'Failed login',
   'ticket.status_changed': 'Ticket status changed',
   'ticket.assignee_changed': 'Ticket assignment changed',
+  'ticket.attachment_added': 'Attachment added',
+  'ticket.attachment_removed': 'Attachment removed',
   'user.created': 'User created',
   'user.role_changed': 'User role changed',
   'user.active_changed': 'User access changed',
@@ -38,6 +40,9 @@ export function describeDetails({ action, metadata = {} }) {
         .join(ARROW);
     case 'ticket.assignee_changed':
       return [metadata.from, metadata.to].map(assigneeLabel).join(ARROW);
+    case 'ticket.attachment_added':
+    case 'ticket.attachment_removed':
+      return `File: ${metadata.name ?? ''}`;
     case 'user.created':
       return `Role: ${roleLabel(metadata.role)}`;
     case 'user.role_changed':
