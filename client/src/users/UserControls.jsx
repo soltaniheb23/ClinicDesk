@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { updateUser } from '../api/index.js';
 import { ROLE_OPTIONS } from './listParams.js';
 
@@ -28,8 +28,11 @@ function useUserUpdate(user, onUpdated) {
 }
 
 // Moves focus to `ref` once when the control mounts with autoFocus (after a save re-mounts it).
+// A layout effect, so focus moves in the same commit that replaces the old control: with a
+// passive effect, focus sat on <body> for a moment after the saved row appeared (a
+// screen-reader user could lose their place, and tests that checked focus flaked).
 function useFocusOnMount(ref, autoFocus) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (autoFocus) ref.current?.focus();
     // Only on mount: later renders must not steal focus.
     // eslint-disable-next-line react-hooks/exhaustive-deps
