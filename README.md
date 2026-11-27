@@ -16,6 +16,7 @@ ClinicDesk gives them one place to create, track, and resolve tickets.
 - Agent dashboard with filters and search
 - Email notifications and SLA timers
 - Audit log of important actions
+- Team metrics page for admins: open tickets, average resolution time, SLA and tickets per agent
 
 ## Tech stack
 **In use:** React, React Router, Vite, Node.js, Express, Jest, Supertest, Vitest, ESLint, Prettier, GitHub Actions, Sentry (error monitoring, off without a DSN)
@@ -197,6 +198,7 @@ API calls.
 - Ticket list filters, search and sorting: [`docs/ticket-list.md`](docs/ticket-list.md)
 - Admin user management and the first admin: [`docs/user-management.md`](docs/user-management.md)
 - Audit log: [`docs/audit-log.md`](docs/audit-log.md)
+- Team metrics (definitions, range rule, admin-only decision, indexes): [`docs/metrics.md`](docs/metrics.md)
 - Security review (OWASP Top 10): [`docs/security-review.md`](docs/security-review.md)
 - File attachments (limits, type detection, storage, access, headers): [`docs/attachments.md`](docs/attachments.md); storage decision: [`docs/decisions/CD-18-attachment-storage.md`](docs/decisions/CD-18-attachment-storage.md)
 - Error monitoring with Sentry (what is reported and removed, setup, test errors): [`docs/monitoring.md`](docs/monitoring.md)

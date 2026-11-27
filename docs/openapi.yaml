@@ -1215,19 +1215,51 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
-  /metrics/summary:
+  /metrics:
     get:
       tags: [Admin]
-      summary: Open tickets, average resolution time, tickets per agent (admin)
+      summary: Team metrics (admin)
+      description: >
+        Admin only: the page compares colleagues. Open tickets and the SLA counts are taken
+        now, whatever the range; the average resolution time and `resolvedInRange` cover
+        tickets whose `resolvedAt` is inside the range (from `from`, inclusive, to
+        `generatedAt`, inclusive). Calendar hours. Only counts, averages, user ids and names:
+        never ticket text, emails or customer data. An unknown or repeated parameter is a
+        400. Order of checks: 401 -> 403 -> 400. `Cache-Control: private, no-store`. See
+        docs/metrics.md.
+      parameters:
+        - name: range
+          in: query
+          description: A rolling window ending now. `all` has no start.
+          schema: { type: string, enum: [7d, 30d, 90d, all], default: 30d }
       responses:
         '200':
-          description: Metrics
+          description: The metrics
           content:
             application/json:
+              schema: { $ref: '#/components/schemas/Metrics' }
               example:
-                openTickets: 12
-                averageResolutionHours: 6.5
-                ticketsPerAgent: [ { agent: Lena, count: 5 } ]
+                range: 30d
+                from: '2026-11-15T12:00:00.000Z'
+                generatedAt: '2026-12-15T12:00:00.000Z'
+                openTickets: { total: 7, byStatus: { open: 3, in_progress: 2, waiting: 2 } }
+                resolution: { averageHours: 76.4, resolvedCount: 12 }
+                perAgent:
+                  - { id: 6650c3a1b2c3d4e5f6a7b8c9, name: Lena Berg, openAssigned: 4, resolvedInRange: 9, inactive: false }
+                  - { id: 6650d4b2c3d4e5f6a7b8c9d2, name: Anton Weber, openAssigned: 0, resolvedInRange: 3, inactive: false }
+                unassigned: { open: 2 }
+                sla: { breachedOpen: 1, atRiskOpen: 3 }
+        '400':
+          description: VALIDATION_ERROR, for example an unknown range
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: Some fields are invalid
+                  details: [ { field: range, message: 'Range must be one of: 7d, 30d, 90d, all' } ]
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
 components:
@@ -1522,6 +1554,69 @@ components:
         uploadedBy:
           allOf: [ { $ref: '#/components/schemas/UserRef' } ]
           nullable: true
+    Metrics:
+      type: object
+      required: [range, from, generatedAt, openTickets, resolution, perAgent, unassigned, sla]
+      properties:
+        range: { type: string, enum: [7d, 30d, 90d, all] }
+        from:
+          type: string
+          format: date-time
+          nullable: true
+          description: The first instant inside the range; null for `all`.
+        generatedAt:
+          type: string
+          format: date-time
+          description: The server's time, the end of the range and the moment of the SLA counts.
+        openTickets:
+          type: object
+          description: Tickets that are not resolved or closed, now, whatever the range.
+          properties:
+            total: { type: integer }
+            byStatus:
+              type: object
+              properties:
+                open: { type: integer }
+                in_progress: { type: integer }
+                waiting: { type: integer }
+        resolution:
+          type: object
+          properties:
+            averageHours:
+              type: number
+              nullable: true
+              description: >
+                Mean of resolvedAt - createdAt, in hours, one decimal, over the tickets
+                resolved in the range. null when there are none (never 0).
+            resolvedCount: { type: integer }
+        perAgent:
+          type: array
+          description: >
+            Every active agent and admin (zeros included), plus deactivated or deleted users
+            who still hold open tickets (`inactive: true`; a deleted user has `name: null`).
+            Sorted by openAssigned, most first, then by name.
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              name: { type: string, nullable: true }
+              openAssigned: { type: integer }
+              resolvedInRange:
+                type: integer
+                description: Tickets resolved in the range that are assigned to this user now.
+              inactive: { type: boolean }
+        unassigned:
+          type: object
+          properties:
+            open: { type: integer }
+        sla:
+          type: object
+          description: >
+            Open tickets by SLA state now, with the same definition as the ?sla= list filter.
+            Tickets created before CD-22 have no SLA and are not counted.
+          properties:
+            breachedOpen: { type: integer }
+            atRiskOpen: { type: integer }
     CommentAuthor:
       type: object
       description: A comment author. Never includes email or passwordHash.
