@@ -7,8 +7,10 @@ const {
   parseTrustCfConnectingIp,
   parseTrustProxy,
 } = require('./config');
+const { captureError } = require('./monitoring/sentry');
 const auditLogsRouter = require('./routes/auditLogs');
 const authRouter = require('./routes/auth');
+const debugRouter = require('./routes/debug');
 const ticketsRouter = require('./routes/tickets');
 const usersRouter = require('./routes/users');
 const { createMailer } = require('./notifications/mailer');
@@ -104,12 +106,13 @@ function createApp({ env = process.env, rateLimit = {}, mailTransport } = {}) {
   app.use('/api/v1/tickets', ticketsRouter);
   app.use('/api/v1/users', usersRouter);
   app.use('/api/v1/audit-logs', auditLogsRouter);
+  app.use('/api/v1/debug', debugRouter);
 
   // Unknown paths and methods: the uniform error shape, not Express's HTML page.
   app.use((_request, response) => response.status(404).json(NOT_FOUND));
 
   // eslint-disable-next-line no-unused-vars
-  app.use((error, _request, response, _next) => {
+  app.use((error, request, response, _next) => {
     if (error.type === 'entity.parse.failed') {
       return response.status(400).json({
         error: { code: 'VALIDATION_ERROR', message: 'Request body must be valid JSON' },
@@ -124,6 +127,9 @@ function createApp({ env = process.env, rateLimit = {}, mailTransport } = {}) {
 
     // The error only: never the request body or headers (passwords, tokens).
     console.error(error);
+    // Only here, for unexpected errors: the 4xx answers above are never reported. Sentry
+    // gets the error and the user's opaque id; the answer below stays the same.
+    captureError(error, request);
     return response.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: 'Something went wrong' },
     });

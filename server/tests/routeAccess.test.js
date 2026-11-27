@@ -130,6 +130,7 @@ const ROUTES = [
     body: () => ({ role: 'agent' }),
   },
   { name: 'GET /audit-logs', method: 'get', path: () => '/api/v1/audit-logs' },
+  { name: 'POST /debug/sentry-test', method: 'post', path: () => '/api/v1/debug/sentry-test' },
 ];
 
 // Expected status per role, with the customer acting on their own ticket.
@@ -149,6 +150,7 @@ const EXPECTED = {
   'POST /users': { customer: 403, agent: 403, admin: 201 },
   'PATCH /users/:id (role)': { customer: 403, agent: 403, admin: 200 },
   'GET /audit-logs': { customer: 403, agent: 403, admin: 200 },
+  'POST /debug/sentry-test': { customer: 403, agent: 403, admin: 200 },
 };
 
 const ROLES = ['customer', 'agent', 'admin'];
