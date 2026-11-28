@@ -85,7 +85,9 @@ shows them, so the ticket can be reassigned.
   Duplicate emails and other server errors appear in a `role="alert"` message.
 - Each row has a role select with **Save**, and **Deactivate** or **Reactivate** with a
   confirmation step. Focus moves to **Cancel**, the safe choice. Server refusals such as
-  `LAST_ADMIN` appear in a `role="alert"` message in that row.
+  `LAST_ADMIN` appear in a `role="alert"` message in that row. Focus goes back to the
+  button after **Cancel** or a refusal, and to the same control after a save (see
+  [Focus management](testing.md#focus-management)).
 - Your own row is marked **You** and has no controls.
 - `/admin/users` is behind `ProtectedRoute roles={['admin']}`. Other roles are sent to
   `/tickets`. This only hides the page: the API checks the role again on every request.
