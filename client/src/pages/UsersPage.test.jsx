@@ -523,10 +523,44 @@ describe('deactivate and reactivate', () => {
 
     const alert = await within(rowFor('Lena Berg')).findByRole('alert');
     expect(alert.textContent).toBe('The last active admin cannot be demoted or deactivated');
+    // Checked at once, without waitFor: focus must already be back when the alert appears
+    // (CD-47).
     expect(document.activeElement).toBe(
       screen.getByRole('button', { name: 'Deactivate Lena Berg' }),
     );
+    expect(screen.queryByRole('group', { name: /Deactivate Lena Berg\?/ })).toBeNull();
     expect(within(rowFor('Lena Berg')).getByText('Active')).toBeTruthy();
+  });
+
+  it('returns focus to the button at once when a reactivation is refused', async () => {
+    const fetchMock = stubUsers({
+      patch: [
+        errorBody(
+          409,
+          'USER_CONFLICT',
+          'The user was changed by someone else. Reload the list and try again.',
+        ),
+      ],
+    });
+    await openPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reactivate Mara Jensen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, reactivate' }));
+
+    const alert = await within(rowFor('Mara Jensen')).findByRole('alert');
+    expect(alert.textContent).toBe(
+      'The user was changed by someone else. Reload the list and try again.',
+    );
+    // No waitFor: the refusal arrives after an await, and focus must move in the same commit
+    // that closes the question (CD-47).
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'Reactivate Mara Jensen' }),
+    );
+    expect(screen.queryByRole('group', { name: /Reactivate Mara Jensen\?/ })).toBeNull();
+    expect(requests(fetchMock, 'PATCH')).toEqual([
+      { url: '/api/v1/users/u3', body: { isActive: true } },
+    ]);
+    expect(within(rowFor('Mara Jensen')).getByText('Deactivated')).toBeTruthy();
   });
 
   it('shows a network failure in an alert', async () => {
