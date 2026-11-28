@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { updateUser } from '../api/index.js';
 import { ROLE_OPTIONS } from './listParams.js';
 
@@ -107,7 +107,10 @@ export function ActiveControl({ user, onUpdated, autoFocus = false }) {
   const deactivate = user.isActive;
   const verb = deactivate ? 'Deactivate' : 'Reactivate';
 
-  useEffect(() => {
+  // A layout effect, like useFocusOnMount: after a refused save, confirm() closes the question
+  // following an await, not a click, so React would run a passive effect only some time after
+  // the commit. Focus then sat on <body> while the error was already shown (CD-47).
+  useLayoutEffect(() => {
     if (confirming) cancelRef.current?.focus();
     else if (returnFocus.current) toggleRef.current?.focus();
     returnFocus.current = false;
